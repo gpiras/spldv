@@ -2,6 +2,7 @@
 # Lab: Binary Choice Model
 # By: Mauricio Sarrias
 # Crated on: Sept 15, 2016
+# Last modification: June 11, 2020
 # Warning: Not completely check
 #######################################################
 
