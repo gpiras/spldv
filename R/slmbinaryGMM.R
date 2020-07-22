@@ -242,7 +242,7 @@ momB_slm <- function(start,
   B       <- solve(A)
   Omega_u <- solve(crossprod(A))
   sigma   <- sqrt(diag(Omega_u))
-  ai      <- B %*% crossprod(t(X), beta) /  sigma
+  ai      <- (B %*% crossprod(t(X), beta)) /  sigma
   Drho    <- Omega_u %*% (W + t(W) - 2*rho * crossprod(W)) %*% Omega_u
   
   if (link == "logit") {
@@ -250,28 +250,27 @@ momB_slm <- function(start,
     f    <- dlogis
     v    <- y - F(ai)
     g    <- (t(Z) %*% v) / N
-    Gb   <- -1 * drop(f(ai)) * (B %*% X) / sigma
+    Gb   <- -1 * drop(f(ai)) * (B %*% X) / matrix(sigma, nrow = N, ncol = K)
     #Grho <- -1 * drop(f(ai)) * (B %*% W %*% ai - (B %*% crossprod(t(X), beta) * diag(Drho) /  (2*sigma^2)))
     Grho <- -1 * drop(f(ai)) * (B %*% W %*% ai - (B %*% crossprod(t(X), beta) * diag(Drho) / (2 * sigma^3)))
     D    <- cbind(Gb, Grho)
   }
   if (link == "probit") {
-    F <- pnorm
-    f <- dnorm
-    ff <- function(x) -x * dnorm(x)
-    q <- 2*y - 1
-    fa  <- f(ai)
-    fa2 <- f(q*ai)
-    Fa <- F(q*ai)
-    ffa <- ff(ai) 
-    v <- q * sigma * (fa/Fa)
+    F    <- pnorm
+    f    <- dnorm
+    ff   <- function(x) -x * dnorm(x)
+    q    <- 2*y - 1
+    fa   <- f(q*ai)
+    Fa   <- F(q*ai)
+    ffa  <- ff(q*ai) 
+    v    <- q * sigma * (fa/Fa)
     g    <- (t(Z) %*% v) / N
-    bs   <- (ffa * Fa - q*fa*fa2) / (Fa^2)
-    Gb <- as.vector(q * sigma * bs) * ((B %*% X) / sigma)
-    grho1 <- (1 / (2 * sigma^2)) *  diag(Drho) * (fa / Fa)
-    grho2 <- as.vector(sigma * bs) * (B %*% W %*% ai - (B %*% crossprod(t(X), beta) * diag(Drho) / (2 * sigma^3)))
-    grho <- q*(grho1 + grho2)
-    D <- cbind(Gb, grho)
+    bs   <- as.vector((ffa * Fa - fa*fa) / (Fa^2))
+    Gb   <- as.vector(q^2 * sigma * bs) * ((B %*% X) / matrix(sigma, nrow = N, ncol = K))
+    grho1 <- (1 / (2 * sigma)) *  diag(Drho) * (fa/Fa)
+    grho2 <- as.vector(sigma * bs * q) * (B %*% W %*% ai - (B %*% crossprod(t(X), beta) * diag(Drho) / (2 * sigma^3)))
+    grho  <- q*(grho1 + grho2)
+    D     <- cbind(Gb, grho)
   }
   
   out <- list(g = g, D = D, v = v)
