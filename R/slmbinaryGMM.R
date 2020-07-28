@@ -34,6 +34,7 @@ slmbinaryGMM <- function(formula, data, subset, na.action,
   # Optimization default
   if (is.null(callT$method)) callT$method <- 'bfgs'
   if (is.null(callT$iterlm)) callT$iterlim <- 100000
+  callT$finalHessian <- FALSE
   
   # Get variables and Globals
   y <- model.response(mf)
@@ -44,25 +45,7 @@ slmbinaryGMM <- function(formula, data, subset, na.action,
   if (n != sn) stop("number of spatial units in W is different to the number of data")
   
   ## Generate instruments Z
-  
-  # if X has a constant, drop it to construct the instruments
-  if (colnames(X)[1] == "(Intercept)") {
-    Xnc <- matrix(X[, -1], dim(X)[1], dim(X)[2] - 1)
-  } else {
-    Xnc <- X
-  }
-  WX  <- matrix(NA, dim(X)[1], dim(Xnc)[2]) 
-  WWX <- matrix(NA, dim(X)[1], dim(Xnc)[2])
-  if (instruments == 1) {
-    for (i in 1:dim(WX)[2])	WX[, i] <- lag.listw(listw, Xnc[, i])
-    Z <- cbind(WX)
-  }	
-  else{ 
-    for (i in 1:dim(WX)[2])	   WX[, i] <- lag.listw(listw, Xnc[, i])
-    for (i in 1:dim(WWX)[2])	WWX[, i] <- lag.listw(listw, WX[, i])
-    Z  <- cbind(WX, WWX)
-  }
-  Z <- cbind(X, Z)
+  Z <- make.inst(X, listw, p =  instruments)
   L <- ncol(Z)
   if (L < K) stop("Underspecified model")
   
@@ -90,7 +73,7 @@ slmbinaryGMM <- function(formula, data, subset, na.action,
   opt$start <- theta
   m <- match(c('method', 'print.level', 'iterlim',
                'start','tol', 'ftol', 'steptol', 'fixed', 'constraints', 
-               'control'),
+               'control', 'finalHesian'),
              names(opt), 0L)
   opt <- opt[c(1L, m)]
   opt[[1]] <- as.name('maxLik')
@@ -109,9 +92,8 @@ slmbinaryGMM <- function(formula, data, subset, na.action,
 
   # Proceed with second step if requested 
   if (type == "twostep") {
-    u_hat <- momB_slm(start = b_hat, y, X, Z, listw, link)$v
-    S <- makeS(Z = Z, ehat = u_hat)
-    if (wmatrix == "robust") W <- solve(S) else W <- solve(drop(crossprod(u_hat) / N) * crossprod(Z) / N)
+    S <- makeS(b_hat, y, X, Z, listw, link, wmatrix)
+    W <- solve(S) 
     cat("\nSecond step GMM optimization based on", wmatrix, "weight matrix \n")
     opt$start <- b_hat
     opt[c('W')] <- list(as.name('W'))
@@ -142,31 +124,68 @@ slmbinaryGMM <- function(formula, data, subset, na.action,
   out
 }
 
+
+make.inst <- function(X, listw, p){
+  # if X has a constant, drop it to construct the instruments
+  if (colnames(X)[1] == "(Intercept)") {
+    Xnc <- matrix(X[, -1], dim(X)[1], dim(X)[2] - 1)
+    colnames(Xnc) <- colnames(X)[-1]
+  } else {
+    Xnc <- X
+  }
+  WX  <- matrix(NA, dim(X)[1], dim(Xnc)[2]) 
+  WWX <- matrix(NA, dim(X)[1], dim(Xnc)[2])
+  name.wx  <- c()
+  name.wwx <- c()
+  if (p == 1) {
+    for (i in 1:dim(WX)[2])	{
+      name.wx <- c(name.wx, paste("w.", colnames(Xnc)[i], sep = ""))
+      WX[, i] <- lag.listw(listw, Xnc[, i])
+    }
+    Z <- cbind(WX)
+    colnames(Z) <- name.wx
+  }	
+  else{ 
+    for (i in 1:dim(WX)[2]) {
+      name.wx <- c(name.wx, paste("w.", colnames(Xnc)[i], sep = ""))
+      WX[, i] <- lag.listw(listw, Xnc[, i])
+    }
+    for (i in 1:dim(WWX)[2]) { 
+      name.wwx <- c(name.wwx, paste("ww.", colnames(Xnc)[i], sep = ""))
+      WWX[, i] <- lag.listw(listw, WX[, i])
+    }
+    Z  <- cbind(WX, WWX)
+    colnames(Z) <- c(name.wx, name.wwx)
+  }
+  Z <- cbind(X, Z)
+  return(Z)
+}
+
 vcov.bingmm <- function(obj, ...){
   vce   <- obj$vce
   type  <- obj$type
   link  <- obj$link
   listw <- obj$listw
   theta <- obj$coefficients
+  wmatrix <- obj$wmatrix
   y     <- obj$y
   Z     <- obj$Z
   X     <- obj$X
   W     <- obj$W
   N     <- nrow(X)
-  u_hat <- momB_slm(start = theta, y, X, Z, listw, link)$v
-  S     <- makeS(Z = Z, ehat = u_hat)
   D     <- momB_slm(start = theta, y, X, Z, listw, link)$D
+  S     <- makeS(theta, y, X, Z, listw, link, wmatrix)
   
   if (vce == "robust") {
-    pan <- solve((t(D) %*% Z / N) %*% W %*% (t(Z) %*% D / N))
-    queso <- (t(D) %*% Z / N) %*% W %*% S %*% W %*% (t(Z) %*% D / N)
-    V <- (1 / N) * pan %*% queso %*% pan
+    pan <- solve(t(D) %*% Z %*% W %*% t(Z) %*% D)
+    queso <- t(D) %*% Z %*% W %*% S %*% W %*% t(Z) %*% D 
+    V <- N * pan %*% queso %*% pan
   } else {
     if (type == "onestep") {
       sigma <- crossprod(u_hat) / N
-      V <- (1/N) * drop(sigma) * solve((t(D) %*% Z / N) %*% W %*% (t(Z) %*% D / N))
+      V <- (1/N) * drop(sigma) * solve((t(D) %*% Z / N) %*% solve(S) %*% (t(Z) %*% D / N))
     } else {
-      V <- (1/N) * solve((t(D) %*% Z / N) %*% W %*% (t(Z) %*% D / N))
+      V <- N * solve(t(D) %*% Z %*% solve(S) %*% t(Z) %*% D)
     }
   }
   colnames(V) <- rownames(V) <- names(theta)
@@ -193,7 +212,6 @@ summary.bingmm <- function(object, ...){
   p <- 2 * (1 - pnorm(abs(z)))
   CoefTable <- cbind(b, std.err, z, p)
   colnames(CoefTable) <- c("Estimate", "Std. Error", "z-value", "Pr(>|z|)")
-  colnames(CoefTable) <- c("Estimate", "Std. Error", "z-value", "Pr(>|z|)")
   object$CoefTable    <- CoefTable
   class(object)       <- c("summary.bingmm", "bingmm")
   return(object)
@@ -217,7 +235,7 @@ print.summary.bingmm <- function(x,
   printCoefmat(x$CoefTable, digit = digits, P.value = TRUE, has.Pvalue = TRUE)
   
   cat(paste("\nSample size:", signif(nrow(x$X), digits)))
-  cat(paste("\nJ at the optimum:", signif(x$opt$maximum, digits)))
+  cat(paste("\nJ at the optimum:", signif(-1 * x$opt$maximum, digits)))
   invisible(x)
 }
 
@@ -242,38 +260,32 @@ momB_slm <- function(start,
   B       <- solve(A)
   Omega_u <- solve(crossprod(A))
   sigma   <- sqrt(diag(Omega_u))
-  ai      <- (B %*% crossprod(t(X), beta)) /  sigma
-  Drho    <- Omega_u %*% (W + t(W) - 2*rho * crossprod(W)) %*% Omega_u
+  ai      <- crossprod(t(B), crossprod(t(X), beta)) /  sigma
+  Drho    <- (1 / (2 * sigma)) * diag(Omega_u %*% (A + t(A)) %*% W %*% Omega_u)
   
-  if (link == "logit") {
-    F    <- plogis
-    f    <- dlogis
-    v    <- y - F(ai)
-    g    <- (t(Z) %*% v) / N
-    Gb   <- -1 * drop(f(ai)) * (B %*% X) / matrix(sigma, nrow = N, ncol = K)
-    #Grho <- -1 * drop(f(ai)) * (B %*% W %*% ai - (B %*% crossprod(t(X), beta) * diag(Drho) /  (2*sigma^2)))
-    Grho <- -1 * drop(f(ai)) * (B %*% W %*% ai - (B %*% crossprod(t(X), beta) * diag(Drho) / (2 * sigma^3)))
-    D    <- cbind(Gb, Grho)
-  }
-  if (link == "probit") {
-    F    <- pnorm
-    f    <- dnorm
-    ff   <- function(x) -x * dnorm(x)
+  # F, f and f' for probit or logit
+  pfun <- switch(link,
+                 "probit" = pnorm,
+                 "logit"  = plogis)
+  dfun <- switch(link,
+                 "probit" = dnorm,
+                 "logit"  = dlogis)
+  ddfun <- switch(link,
+                  "logit"  = function(x) (1 - 2 * pfun(x)) * pfun(x) * (1 - pfun(x)),
+                  "probit" = function(x) -x * dnorm(x))  
+
     q    <- 2*y - 1
-    fa   <- f(q*ai)
-    Fa   <- F(q*ai)
-    ffa  <- ff(q*ai) 
-    v    <- q * sigma * (fa/Fa)
-    g    <- (t(Z) %*% v) / N
-    bs   <- as.vector((ffa * Fa - fa*fa) / (Fa^2))
-    Gb   <- as.vector(q^2 * sigma * bs) * ((B %*% X) / matrix(sigma, nrow = N, ncol = K))
-    grho1 <- (1 / (2 * sigma)) *  diag(Drho) * (fa/Fa)
-    grho2 <- as.vector(sigma * bs * q) * (B %*% W %*% ai - (B %*% crossprod(t(X), beta) * diag(Drho) / (2 * sigma^3)))
-    grho  <- q*(grho1 + grho2)
-    D     <- cbind(Gb, grho)
-  }
+    fa   <- dfun(q*ai)
+    Fa   <- pfun(q*ai)
+    ffa  <- ddfun(q*ai) 
+    v    <- q * (fa/Fa)                                                            # Generalized residuals
+    g    <- crossprod(Z, v) / N                                                    # Moment conditions
+    der  <- as.vector(q^2 * ((ffa * Fa - fa^2) / (Fa^2)))                          # Common vector of the derivative
+    Gb   <- crossprod(t(B), X) *  matrix(der/sigma, nrow = N, ncol = K)            # Gradient of beta: N * K
+    grho <- der * (crossprod(t(B), crossprod(t(W), ai)) - (1 / sigma) * ai * Drho) # Gradient of rho
+    D    <- cbind(Gb, grho)                                                        # N * K Jacobian matrix
   
-  out <- list(g = g, D = D, v = v)
+  out <- list(g = g, D = D, v = v, u = y - pfun(ai), h = fa/(Fa*(1 - Fa)))
   return(out)
 }
 
@@ -281,173 +293,47 @@ momB_slm <- function(start,
 J_minML <- function(start, y, X, Z, listw, link, W, gradient){
   getR <- momB_slm(start, y, X, Z, listw, link)
   g <-  getR$g
-  J <-  -1*t(g) %*% W %*% g
+  J <-  -1 * crossprod(g, crossprod(t(W), g)) # g'Wg 
   
   if (gradient) {
     N <- nrow(X)
     D <- getR$D # N x K matrix
-    G <- -2 * t(t(Z) %*% D/N) %*% W %*% g
+    G <- -2 * t(crossprod(Z, D / N)) %*% crossprod(t(W), g)
     attr(J, "gradient") <- t(G)
   }
   return(J)
 }
 
 # Make S matrix: var-cov of moments
-makeS <- function(Z, ehat){
-  # Create S hat
-  N <- nrow(Z)
-  Shat <- 0
-  for (i in 1:N) {
-    Shat <- Shat + (ehat[i] ^ 2 * tcrossprod(Z[i,]))
+makeS <- function(b_hat, y, X, Z, listw, link, wmatrix){
+  N <- nrow(X)
+  evm <- momB_slm(start = b_hat, y, X, Z, listw, link)
+  if (wmatrix == "iid") {
+    u_hat <- evm$v
+    Shat <- 0
+    for (i in 1:N) {
+      Shat <- Shat + (u_hat[i] ^ 2 * tcrossprod(Z[i,]))
+    }
+    Shat <- Shat / N
+  } else {
+    h       <- evm$h
+    u       <- evm$u
+    Shat <- 0
+    for (i in 1:N) {
+      Shat <- Shat + (h[i]^2 * u[i] ^ 2 * tcrossprod(Z[i,]))
+    }
+    Shat <- Shat / N
   }
-  return(Shat/N)
+  return(Shat)
 }
 
-
-#### I. Check SLM probit ----
-library("McSpatial")
-set.seed(2222)
-cmap <- readShapePoly(system.file("maps/CookCensusTracts.shp",
-                                  package="McSpatial"))
-cmap <- cmap[cmap$CHICAGO==1&cmap$CAREA!="O'Hare",]
-lmat <- coordinates(cmap)
-dnorth <- geodistance(lmat[,1],lmat[,2], -87.627800, 
-                      41.881998, dcoor=TRUE)$dnorth
-cmap <- cmap[dnorth>0,]
-wmat <- makew(cmap)$wmat
-n = nrow(wmat)
-alpha  <- -1.5
-beta   <- 0.5
-rho <- 0.6
-x <- rnorm(n, 4, 2)
-u <- rnorm(n)
-A <- solve(diag(n) - rho*wmat)
-ystar <- A %*% (alpha + beta * x) + A %*% u
-y <- as.numeric(ystar > 0)
-data <- as.data.frame(cbind(y, x))
-
-## Check two-step robust VCE with gradient
-check1 <- slmbinaryGMM(y ~ x, 
-                       listw = mat2listw(wmat), 
-                       data = data, 
-                       instruments = 1, 
-                       link = "probit", 
-                       winitial = "optimal", 
-                       type = "twostep",
-                       wmatrix = "robust",
-                       gradient = TRUE, 
-                       print.level = 2)
-summary(check1)
-
-
-## Check two-step robust VCE without gradient
-check2 <- slmbinaryGMM(y ~ x, 
-                       listw = mat2listw(wmat), 
-                       data = data, 
-                       instruments = 1, 
-                       link = "probit", 
-                       winitial = "optimal", 
-                       type = "twostep",
-                       wmatrix = "robust",
-                       gradient = FALSE, 
-                       print.level = 2)
-summary(check2)
-
-
-## Check McMillien function
-check3 <- gmmprobit(y ~ x, 
-                       wmat = wmat)
-check3
-
-check4 <- spprobit(y ~ x, 
-                    wmat = wmat)
-check4
-
-## Check with more instruments
-check5 <- slmbinaryGMM(y ~ x, 
-                       listw = mat2listw(wmat), 
-                       data = data, 
-                       instruments = 2, 
-                       link = "probit", 
-                       winitial = "optimal", 
-                       type = "twostep",
-                       wmatrix = "robust",
-                       gradient = TRUE, 
-                       print.level = 2)
-summary(check5)
-
-
-#### I. Check SLM logit ----
-library("McSpatial")
-set.seed(1111)
-cmap <- readShapePoly(system.file("maps/CookCensusTracts.shp",
-                                  package="McSpatial"))
-cmap <- cmap[cmap$CHICAGO==1&cmap$CAREA!="O'Hare",]
-lmat <- coordinates(cmap)
-dnorth <- geodistance(lmat[,1],lmat[,2], -87.627800, 
-                      41.881998, dcoor=TRUE)$dnorth
-cmap <- cmap[dnorth>0,]
-wmat <- makew(cmap)$wmat
-n = nrow(wmat)
-alpha  <- -1.5
-beta   <- 0.5
-rho    <- 0.6
-x <- rnorm(n, 4, 2)
-u <- rlogis(n)
-A <- solve(diag(n) - rho*wmat)
-ystar <- A %*% (alpha + beta * x) + A %*% u
-y <- as.numeric(ystar > 0)
-data <- as.data.frame(cbind(y, x))
-
-## Check two-step robust VCE with gradient
-check1 <- slmbinaryGMM(y ~ x, 
-                       listw = mat2listw(wmat), 
-                       data = data, 
-                       instruments = 1, 
-                       link = "logit", 
-                       winitial = "optimal", 
-                       type = "twostep",
-                       wmatrix = "robust",
-                       gradient = TRUE, 
-                       print.level = 2)
-summary(check1)
-
-
-## Check two-step robust VCE without gradient
-check2 <- slmbinaryGMM(y ~ x, 
-                       listw = mat2listw(wmat), 
-                       data = data, 
-                       instruments = 1, 
-                       link = "logit", 
-                       winitial = "optimal", 
-                       type = "twostep",
-                       wmatrix = "robust",
-                       gradient = FALSE, 
-                       print.level = 2)
-summary(check2)
-
-
-## Check McMillien function
-check3 <- gmmlogit(y ~ x, 
-                    wmat = wmat)
-check3
-
-check4 <- splogit(y ~ x, 
-                   wmat = wmat)
-check4
-
-## Check with more instruments
-check5 <- slmbinaryGMM(y ~ x, 
-                       listw = mat2listw(wmat), 
-                       data = data, 
-                       instruments = 2, 
-                       link = "logit", 
-                       winitial = "optimal", 
-                       type = "twostep",
-                       wmatrix = "robust",
-                       gradient = TRUE, 
-                       print.level = 2)
-summary(check5)
-
-
-
+### Overtest
+over.test <- function(object, ...){
+  Z <- object$Z
+  K <- length(coef(object))
+  L <- ncol(Z)
+  N <- nrow(Z)
+  J <- -N * object$opt$maximum 
+  out <- list(statistic =  J, df = L - K, p.value =  pchisq(J, L - K, lower.tail =  FALSE))
+  return(out)
+}
