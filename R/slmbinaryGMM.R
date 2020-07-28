@@ -1,6 +1,6 @@
 ## This function estimates SLM binary models of the form:
 ## y^* = (I - rho W)^{-1}XB + I - rho W)^{-1} * epsilon
-## using standard GMM (not linerized)
+## using standard GMM (not linerized) :()
 
 slmbinaryGMM <- function(formula, data, subset, na.action, 
                          listw = NULL, 
