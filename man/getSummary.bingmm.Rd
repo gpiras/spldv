@@ -18,6 +18,12 @@
 
 \item{alpha}{level of the confidence intervals,}
 
+\item{vce}{string indicating what kind of standard errors should be computed when using \code{summary}. For the one-step GMM estimator, the options are \code{"robust"} and \code{"ml"}. For the two-step GMM estimator, the options are \code{"robust"}, \code{"efficient"} and \code{"ml"}. The option \code{"vce = ml"} is an exploratory method that evaluates the VC of the RIS estimator using the GMM estimates.}
+
+\item{method}{only valid if \code{vce = "ml"}. It indicates the algorithm used to compute the Hessian matrix of the RIS estimator. The defult is \code{"bhhh"}.}
+
+\item{R}{only valid if \code{vce = "ml"}. It indicates the number of draws used to compute the simulated probability in the RIS estimator.}
+
 \item{...}{further arguments,}
 }
 \description{

@@ -6,13 +6,11 @@
 \alias{print.binlgmm}
 \alias{summary.binlgmm}
 \alias{print.summary.binlgmm}
-\title{Estimation of SAR for binary models using LGMM}
+\title{Estimation of SAR for binary models using Linearized GMM for either Probit or Logit models.}
 \usage{
 sbinaryLGMM(
   formula,
   data,
-  subset,
-  na.action,
   listw = NULL,
   nins = 2,
   link = c("logit", "probit"),
@@ -25,13 +23,25 @@ sbinaryLGMM(
 
 \method{summary}{binlgmm}(object, ...)
 
-\method{print}{summary.binlgmm}(
-  x,
-  digits = max(3, getOption("digits") - 2),
-  width = getOption("width"),
-  ...
-)
+\method{print}{summary.binlgmm}(x, digits = max(3, getOption("digits") - 2), ...)
+}
+\arguments{
+\item{formula}{a symbolic description of the model of the form \code{y ~ x | x} where \code{y} is the binary dependent variable, \code{x} are the independent variables. The variables after \code{|} are those variables that enter spatially lagged: WX.}
+
+\item{data}{the data of class \code{data.frame}.}
+
+\item{listw}{a \code{listw} object.}
+
+\item{nins}{order of instrumental-variable approximation; as default \code{nins = 2}, such that \eqn{H = (X, WX, W^2X)} are used as instruments.}
+
+\item{link}{the assumption of the distribution of the error term; it can be either \code{link = "probit"} (the default) or \code{link = "logit"}.}
+
+\item{...}{additional arguments.}
+
+\item{x, object, }{an object of class \code{binlgmm}.}
+
+\item{digits}{the number of digits}
 }
 \description{
-Estimation of SAR for binary models using LGMM
+Estimation of SAR for binary models using Linearized GMM for either Probit or Logit models.
 }

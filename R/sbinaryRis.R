@@ -171,12 +171,12 @@ halton <- function(prime = 3, length = 100, drop = 10){
 #' @export 
 getSummary.maxLik <- function(obj, alpha = 0.05, ...){
   smry <- summary(obj)$estimate
-  coef <- smry$Coef
+  coef <- smry
   lower <- coef[, 1] - coef[, 2] * qnorm(alpha/2)
   upper <- coef[, 1] + coef[, 2] * qnorm(alpha/2)
   coef <- cbind(coef, lower, upper)
   colnames(coef) <- c("est", "se", "stat", "p", "lwr", "upr")
-  N <-  nrow(obj$X)
+  N <-  nrow(obj$gradientObs)
   sumstat <- c(logLik = NA, deviance = NA, AIC = NA, BIC = NA, N = N, 
                LR = NA, df = NA, p = NA, Aldrich.Nelson = NA, McFadden = NA, Cox.Snell = NA,
                Nagelkerke = NA)

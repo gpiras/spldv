@@ -1,14 +1,20 @@
 Package: spldv
 Type: Package
-Title: What the Package Does (Title Case)
+Title: Spatial models for limited dependent variables
 Version: 0.1.0
-Author: Who wrote it
-Maintainer: The package maintainer <yourself@somewhere.net>
-Description: More about what it does (maybe more than one line)
-    Use four spaces when indenting paragraphs within the Description.
+Date: 2021-11-3
+Authors@R: c(person("Mauricio", "Sarrias", role = c("aut", "cre"), 
+                    email = "msarrias86@gmail.com", 
+                    comment = c(ORCID = "0000-0001-5932-4817")), 
+             person("Gianfranco", "Piras", role = c("aut"), 
+                    email = "gpiras@mac.com", 
+                    comment = c(ORCID = "0000-0003-0225-6061")),
+            person("Daniel", "McMillen", role = "ctb"))
+Description: The current version of this package estimates spatial autoregressive models for binary dependent variables using GMM estimators. It supports one- and 
+  two-steps GMM estimator along with the linearized GMM estimator proposed by Klier and McMillen (2008). It also allows for either Probit or Logit model. 
 Encoding: UTF-8
 LazyData: true
-RoxygenNote: 7.1.1
+RoxygenNote: 7.1.2
 Depends:
     R (>= 4.0)
 Imports:
@@ -20,5 +26,7 @@ Imports:
     memisc, 
     car, 
     methods
+Suggests:
+    spdep
 License: GPL (>= 2)    
    

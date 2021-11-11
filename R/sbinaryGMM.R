@@ -1,17 +1,144 @@
 ##### Functions for sbinaryGMM ####
 
 
-#' Estimation of SAR for binary models using GMM
+#' Estimation of SAR for binary dependent models using GMM
+#' 
+#' Estimation of SAR model for binary dependent variables, either Probit or Logit, using one- or two-step GMM estimator.
 #' 
 #' @name sbinaryGMM
+#' @param formula a symbolic description of the model of the form \code{y ~ x | x} where \code{y} is the binary dependent variable, \code{x} are the independent variables. The variables after \code{|} are those variables that enter spatially lagged: WX.
+#' @param data the data of class \code{data.frame}.
+#' @param listw a \code{listw} object.  
+#' @param nins order of instrumental-variable approximation; as default \code{nins = 2}, such that \eqn{H = (X, WX, W^2X)} are used as instruments.  
+#' @param link the assumption of the distribution of the error term; it can be either \code{link = "probit"} (the default) or \code{link = "logit"}. 
+#' @param winitial a string indicating the initial moment-weighting matrix Psi; it can be either \code{winitial = "optimal"} (the default) or \code{winitial = "identity"}. 
+#' @param s.matrix only valid of \code{type = "twostep"} is used. This is a string indicating the type of variance-covariance matrix \eqn{\hat{S}} to be used in the second-step procedure; it can be \code{s.matrix = "robust"} (the default) or \code{s.matrix = "iid"}.
+#' @param type string indicating whether the one-step (\code{type = "onestep"}), or two-step GMM (\code{type = "twostep"}) should be computed.
+#' @param gradient logical. Should the analytic gradient be used in the GMM optimization procedure? \code{TRUE} as default. If \code{FALSE}, then the numerical gradient is used. 
+#' @param start if not \code{NULL}, the user must provide a vector of initial parameters for the optimization procedure. When \code{start = NULL}, \code{sbinaryGMM} uses the traditional Probit or Logit estimates as initial values for the parameters, and the correlation between \eqn{y} and \eqn{Wy} as initial value for \eqn{\rho}.
+#' @param cons.opt logical. Should a constrained optimization procedure for \eqn{rho} be used? \code{FALSE} as default.  
+#' @param approximation logical. If \code{TRUE} then \eqn{(I - \rho W)^{-1}} is approximated as \eqn{I + \rho W + \rho^2 W^2 + \rho^3 W^3}. The default is \code{FALSE}.
+#' @param verbose logical. If \code{TRUE}, the code reports messages and some values during optimization. 
+#' @param print.init logical. If \code{TRUE} the initial parameters used in the optimization are printed. 
+#' @param ... additional arguments passed to \code{maxLik}.
+#' @param x,object,  an object of class \code{bingmm}
+#' @param vce string indicating what kind of standard errors should be computed when using \code{summary}. For the one-step GMM estimator, the options are \code{"robust"} and \code{"ml"}. For the two-step GMM estimator, the options are \code{"robust"}, \code{"efficient"} and \code{"ml"}. The option \code{"vce = ml"} is an exploratory method that evaluates the VC of the RIS estimator using the GMM estimates.
+#' @param R only valid if \code{vce = "ml"}. It indicates the number of draws used to compute the simulated probability in the RIS estimator.  
+#' @param method only valid if \code{vce = "ml"}. It indicates the algorithm used to compute the Hessian matrix of the RIS estimator. The defult is \code{"bhhh"}.  
+#' @param digits the number of digits
+#' @details 
+#' 
+#' The data generating process is:
+#' 
+#' \deqn{
+#' y^*= X\beta + WX\delta + \rho Wy + \epsilon
+#' }
+#' where  \eqn{y = 1} if \eqn{y^*>0} and 0 otherwise; \eqn{\epsilon ~ N(0, 1)} if \code{link = "probit"} and \eqn{\epsilon ~ L(0, \pi^2/3)}. The general GMM
+#'   estimator minimizes 
+#' \deqn{
+#'  J(\theta) = g'(\theta)\hat{\Psi} g(\theta)
+#' }
+#' where \eqn{\theta = (\beta, \delta, \rho)}
+#' \deqn{
+#' g = n^{-1}H'v
+#' }
+#' where \code{v} is the generalized residuals. Let \eqn{X_f = (X, WX)}, then the instrument matrix \code{H} contains the linearly independent
+#' columns of \eqn{H = (X_f, WX_f, ..., W^qX_f)}. The one-step GMM estimator minimizes \eqn{J(\theta)} setting either 
+#' \eqn{\hat{\Psi} = I_p} if \code{winitial = "identity"} or \eqn{\hat{\Psi} = (H'H/n)^{-1}} if \code{winitial = "optimal"}. The two-step GMM estimator
+#' uses an additional step to achieve higher efficiency by computing the variance-covariance matrix of the moments \eqn{\hat{S}} to weight the sample moments.
+#' This matrix is computed using the residuals or generalized residuals from the first-step, which are consistent. This matrix is computed as
+#'  \eqn{\hat{S} = n^{-1}\sum_{i = 1}^n h_i(\phi^2/(\Phi(1 - \Phi)))h_i'} if \code{s.matrix = "robust"} or 
+#'   \eqn{\hat{S} = n^{-1}\sum_{i = 1}^n \hat{v}_ih_ih_i'}, where \eqn{\hat{v}} are the first-step generalized residuals. 
+#'   
+#' @author Mauricio Sarrias and Gianfranco Piras. 
+#' @return An object of class ``\code{bingmm}'', a list with elements:
+#' \item{coefficients}{the estimated coefficients,}
+#' \item{call}{the matched call,} 
+#' \item{X}{the X matrix, which contains also WX if the second part of the \code{formula} is used, }
+#' \item{H}{the H matrix of instruments used,}
+#' \item{y}{the dependent variable,}
+#' \item{listw}{the spatial weight matrix,}
+#' \item{Psi}{the moment-weighting matrix used in the last round,}
+#' \item{type}{type of model that was fitted,}
+#' \item{s.matrix}{the type of S matrix used in the second round,}
+#' \item{x}{object of class \code{maxLik},}
+#' \item{approximation}{a logical value indicating whether approximation was used to compute the inverse matrix.}
+#' @examples 
+#' # Data set
+#' data(oldcol, package = "spdep")
+#' 
+#' # Create dependent (dummy) variable
+#' COL.OLD$CRIMED <- as.numeric(COL.OLD$CRIME > 35)
+#' 
+#' # Two-step (Probit) GMM estimator
+#' ts <- sbinaryGMM(CRIMED ~ INC + HOVAL,
+#'                 link = "probit", 
+#'                 listw = spdep::nb2listw(COL.nb, style = "W"), 
+#'                 data = COL.OLD, 
+#'                 type = "twostep",
+#'                 verbose = TRUE)
+#'# Robust standard errors
+#'summary(ts)
+#'# Efficient standard errors
+#'summary(ts, vce = "efficient")
+#'
+#'# One-step (Probit) GMM estimator 
+#'os <- sbinaryGMM(CRIMED ~ INC + HOVAL,
+#'                 link = "probit", 
+#'                 listw = spdep::nb2listw(COL.nb, style = "W"), 
+#'                 data = COL.OLD, 
+#'                 type = "onestep",
+#'                 verbose = TRUE)
+#'summary(os)
+#'
+#'# One-step (Logit) GMM estimator with identity matrix as initial weight matrix
+#'os_l <- sbinaryGMM(CRIMED ~ INC + HOVAL,
+#'                   link = "logit", 
+#'                   listw = spdep::nb2listw(COL.nb, style = "W"), 
+#'                   data = COL.OLD, 
+#'                   type = "onestep",
+#'                   winitial = "identity", 
+#'                   verbose = TRUE)
+#'summary(os_l)
+#'
+#'# Two-step (Probit) GMM estimator with WX
+#'ts_wx <- sbinaryGMM(CRIMED ~ INC + HOVAL| INC + HOVAL,
+#'                    link = "probit", 
+#'                    listw = spdep::nb2listw(COL.nb, style = "W"), 
+#'                    data = COL.OLD, 
+#'                    type = "twostep",
+#'                    verbose = FALSE)
+#'summary(ts_wx)
+#'
+#'# Constrained two-step (Probit) GMM estimator 
+#'ts_c <- sbinaryGMM(CRIMED ~ INC + HOVAL,
+#'                   link = "probit", 
+#'                   listw = spdep::nb2listw(COL.nb, style = "W"), 
+#'                   data = COL.OLD, 
+#'                   type = "twostep",
+#'                   verbose = TRUE, 
+#'                   cons.opt = TRUE)
+#'summary(ts_c)
+#' @references 
+#' 
+#' Pinkse, J., & Slade, M. E. (1998). Contracting in space: An application of spatial statistics to discrete-choice models. Journal of Econometrics, 85(1), 125-154.
+#' 
+#' Fleming, M. M. (2004). Techniques for estimating spatially dependent discrete choice models. In Advances in spatial econometrics (pp. 145-168). Springer, Berlin, Heidelberg.
+#' 
+#' Klier, T., & McMillen, D. P. (2008). Clustering of auto supplier plants in the United States: generalized method of moments spatial logit for large samples. Journal of Business & Economic Statistics, 26(4), 460-471.
+#' 
+#' LeSage, J. P., Kelley Pace, R., Lam, N., Campanella, R., & Liu, X. (2011). New Orleans business recovery in the aftermath of Hurricane Katrina. Journal of the Royal Statistical Society: Series A (Statistics in Society), 174(4), 1007-1027.
+#' 
+#' @seealso \code{\link[spldv]{sbinaryLGMM}}.
 #' @import Matrix stats spatialreg methods Formula maxLik
 #' @export 
-sbinaryGMM <- function(formula, data, subset, na.action, 
+sbinaryGMM <- function(formula, 
+                       data, 
                        listw = NULL, 
                        nins = 2,                                        # number of instruments
-                       link = c("logit", "probit"),                     # probit or logit?
+                       link = c("probit", "logit"),                     # probit or logit?
                        winitial = c("optimal", "identity"),             # initial moment-weighing matrix
-                       s.matrix = c("iid", "robust"),                   # estimate for second round moment-weighing matrix
+                       s.matrix = c("robust", "iid"),                   # estimate for second round moment-weighing matrix
                        type = c("onestep", "twostep"),                  # one- and two-step procedure
                        gradient = TRUE,                                 # use the gradient of J for the minimization?
                        start    = NULL,                                 # vector of starting values 
@@ -27,7 +154,6 @@ sbinaryGMM <- function(formula, data, subset, na.action,
   #     1. If iid then S = n^1sum_i u_i^2h_ih_i'
   #     2. If robust then as in the paper
   # In this version, we use the notation in paper. 
-  
   
   # Obtain arguments 
   winitial    <- match.arg(winitial)
@@ -46,7 +172,8 @@ sbinaryGMM <- function(formula, data, subset, na.action,
   m        <- match(c("formula", "data"), names(mf), 0L)
   mf       <- mf[c(1L, m)]
   f1       <- Formula(formula)
-  #Check if there exists WX variables 
+  #Check if there exist WX variables (second part of Formula)
+  ##FIXME: check if variables in the second part of formula are also part of the first part
   if (length(f1)[2L] == 2L) mixed <- TRUE else mixed <- FALSE 
   mf$formula <- f1 
   mf[[1L]] <- as.name("model.frame")
@@ -62,6 +189,8 @@ sbinaryGMM <- function(formula, data, subset, na.action,
   # Get variables and checks
   y  <- model.response(mf)
   if (any(is.na(y))) stop("NAs in dependent variable")
+  if (!all(y %in% c(0, 1, TRUE, FALSE))) stop("All dependent variables must be either 0, 1, TRUE or FALSE")
+  if (!is.numeric(y)) y <- as.numeric(y)
   X  <- model.matrix(f1, data = mf, rhs = 1)
   if (mixed){
      x.for.w <- model.matrix(f1, data = mf, rhs = 2)
@@ -83,7 +212,7 @@ sbinaryGMM <- function(formula, data, subset, na.action,
   ## Generate initial instruments and in Kelejian 
   Z <- make.instruments(W, x = X, q = nins)
   H <- cbind(X, Z)
-  # Let linearly independent columns
+  # Just linearly independent columns
   H <- H[, qr(H)$pivot[seq_len(qr(H)$rank)]]
   P <- ncol(H)
   if (P < K) stop("Underspecified model")
@@ -101,8 +230,8 @@ sbinaryGMM <- function(formula, data, subset, na.action,
     names(theta) <- c(colnames(X), "rho")
   } else {
      theta <- start
-     names(theta) <- c(colnames(X), "rho")
      if (length(start) != length(c(colnames(X), "rho"))) stop("Incorrect number of intial parameters")
+     names(theta) <- c(colnames(X), "rho")
   }
   if (print.init) {
     cat("\nStarting Values:\n")
@@ -133,7 +262,7 @@ sbinaryGMM <- function(formula, data, subset, na.action,
   opt$start <- theta
   m <- match(c('method', 'print.level', 'iterlim',
                'start','tol', 'ftol', 'steptol', 'fixed', 'constraints', 
-               'control', 'finalHessian'),
+               'control', 'finalHessian', 'reltol'),
              names(opt), 0L)
   opt <- opt[c(1L, m)]
   opt[[1]]     <- as.name('maxLik')
@@ -185,18 +314,9 @@ sbinaryGMM <- function(formula, data, subset, na.action,
   out
 }
 
-##### Other functions
-
-## Helper functions ----
-
+##### Other functions ----
 # Moment function
-momB_slm <- function(start, 
-                     y, 
-                     X, 
-                     H,
-                     listw, 
-                     link,
-                     approximation){
+momB_slm <- function(start, y, X, H, listw, link, approximation){
   # This function generates: 
   #  (1) generalized residuals
   #  (2) the moment conditions 
@@ -281,25 +401,26 @@ makeS <- function(b_hat, y, X, H, listw, link, wmatrix, approximation){
       Shat <- Shat + (H[i, ] %*% t(H[i, ] * vu[i]))
     }
     #Shat <- Shat / (N^2)
-    Shat <- Shat / (N)
+    Shat <- Shat / N
   }
   return(Shat)
 }
 
 ### Overtest
-over.test <- function(object, ...){
-  H <- object$H
-  K <- length(coef(object))
-  P <- ncol(H)
-  N <- nrow(H)
-  J <- -N * object$opt$maximum 
-  out <- list(statistic =  J, df = P - K, p.value =  pchisq(J, P - K, lower.tail =  FALSE))
-  return(out)
-}
+#over.test <- function(object, ...){
+#  H <- object$H
+#  K <- length(coef(object))
+#  P <- ncol(H)
+#  N <- nrow(H)
+#  J <- -N * object$opt$maximum 
+#  out <- list(statistic =  J, df = P - K, p.value =  pchisq(J, P - K, lower.tail =  FALSE))
+#  return(out)
+#}
 
 make.instruments <- function(listw, x, q = 3){
+  # This function creates the instruments (WX, ...,W^qX) as in K&P
   W <- listw
-  # Drop constant
+  # Drop constant (if any)
   names.x <- colnames(x)
   if (names.x[1] == "(Intercept)") x <- matrix(x[,-1], dim(x)[1], dim(x)[2] - 1)
   names.x <- names.x[which(names.x != "(Intercept)")]
@@ -349,19 +470,24 @@ vcov.bingmm <- function(object, vce = c("robust", "efficient", "ml"), method = "
   Psi      <- object$Psi
   N        <- nrow(X)
   G        <- momB_slm(start = theta, y, X, H, listw, link, approximation)$G # Gradient evaluated at the optimum
-  S        <- makeS(theta, y, X, H, listw, link, s.matrix, approximation)
-  if (vce == "efficient" && type == "onestep") stop("Efficient VCE for one-ste estimator not yet implemented")
+  if (vce == "efficient" && type == "onestep") stop("Efficient VCE for one-step estimator not yet implemented")
   if (vce == "efficient"){
-    G_bar  <- (t(H) %*% G)
-    # Similar to stata, we use the the Psi that was used to compute the final-round estimate 
-    V      <- N * solve(t(G_bar) %*% Psi %*% G_bar)
+    #G_bar  <- (t(H) %*% G)
+    G_bar  <- crossprod(H, G)
+    # Similar to Stata, we use the the Psi that was used to compute the final-round estimate 
+    V      <- N * solve(crossprod(G_bar, crossprod(t(Psi), G_bar)))
+    #V      <- N * solve(t(G_bar) %*% Psi %*% G_bar)
   }
   if (vce == "robust"){
-    # Based on Stata Psi is the weight matrix requested with wmatrix and 
-    # it is calculated based on the residuals obtain after the first estimation step. 
-    G_bar <- t(H) %*% G
-    pan   <- solve(t(G_bar) %*% Psi %*% G_bar)
-    queso <- t(G_bar) %*% Psi %*% S %*% Psi %*% G_bar
+    S        <- makeS(theta, y, X, H, listw, link, s.matrix, approximation)
+    # Based on Stata Psi is the weight matrix requested with wmatrix() and 
+    # it is calculated based on the residuals obtained after the first estimation step. 
+    #G_bar <- t(H) %*% G
+    G_bar  <- crossprod(H, G)
+    #pan   <- solve(t(G_bar) %*% Psi %*% G_bar)
+    pan    <- solve(crossprod(G_bar, crossprod(t(Psi), G_bar)))
+    #queso <- t(G_bar) %*% Psi %*% S %*% Psi %*% G_bar
+    queso <- crossprod(t(crossprod(G_bar, Psi)), crossprod(t(crossprod(t(S), Psi)), G_bar))
     V     <- N * pan %*% queso %*% pan
   }
   if (vce == "ml"){
@@ -451,6 +577,9 @@ print.summary.bingmm <- function(x,
 #' 
 #' @param obj a \code{bingmm} object,
 #' @param alpha level of the confidence intervals,
+#' @param vce string indicating what kind of standard errors should be computed when using \code{summary}. For the one-step GMM estimator, the options are \code{"robust"} and \code{"ml"}. For the two-step GMM estimator, the options are \code{"robust"}, \code{"efficient"} and \code{"ml"}. The option \code{"vce = ml"} is an exploratory method that evaluates the VC of the RIS estimator using the GMM estimates.
+#' @param R only valid if \code{vce = "ml"}. It indicates the number of draws used to compute the simulated probability in the RIS estimator.  
+#' @param method only valid if \code{vce = "ml"}. It indicates the algorithm used to compute the Hessian matrix of the RIS estimator. The defult is \code{"bhhh"}.  
 #' @param ... further arguments,
 #' 
 #' @details For more details see package \pkg{memisc}.
@@ -472,9 +601,8 @@ getSummary.bingmm <- function(obj, alpha = 0.05, vce = c("robust", "efficient", 
        xlevels = NULL, call = obj$call)
 }
 
-## Impacts ----
+#FIXME: To be exported and improved later Impacts ----
 
-#' @export
 dydx.bingmm <- function(object, het = TRUE, ...){
   # This function computes the marginal effects for bingmm class models
   link     <- object$link

@@ -1,15 +1,24 @@
 ##### Functions for sbinaryLGMM ####
 
-#' Estimation of SAR for binary models using LGMM
+#' Estimation of SAR for binary models using Linearized GMM for either Probit or Logit models. 
 #' 
 #' @name sbinaryLGMM
+#' @param formula a symbolic description of the model of the form \code{y ~ x | x} where \code{y} is the binary dependent variable, \code{x} are the independent variables. The variables after \code{|} are those variables that enter spatially lagged: WX.
+#' @param data the data of class \code{data.frame}.
+#' @param listw a \code{listw} object.  
+#' @param nins order of instrumental-variable approximation; as default \code{nins = 2}, such that \eqn{H = (X, WX, W^2X)} are used as instruments.  
+#' @param link the assumption of the distribution of the error term; it can be either \code{link = "probit"} (the default) or \code{link = "logit"}. 
+#' @param x,object, an object of class \code{binlgmm}.
+#' @param digits the number of digits
+#' @param ... additional arguments.
 #' @import Matrix car stats spatialreg methods
 #' @export 
-sbinaryLGMM <- function(formula, data, subset, na.action, 
+sbinaryLGMM <- function(formula, data, 
                         listw = NULL, 
-                        nins  = 2, # Number of instruments
-                        link  = c("logit", "probit"),
-                        ...){
+                        nins  = 2, 
+                        link  = c("logit", "probit"), 
+                        ...)
+{
   # Based on McMillen's code 
   link  <- match.arg(link)
   
@@ -34,6 +43,8 @@ sbinaryLGMM <- function(formula, data, subset, na.action,
   # Get variables and checks
   y  <- model.response(mf)
   if (any(is.na(y))) stop("NAs in dependent variable")
+  if (!all(y %in% c(0, 1, TRUE, FALSE))) stop("All dependent variables must be either 0, 1, TRUE or FALSE")
+  if (!is.numeric(y)) y <- as.numeric(y)
   X  <- model.matrix(f1, data = mf, rhs = 1)
   if (mixed){
     x.for.w <- model.matrix(f1, data = mf, rhs = 2)
@@ -191,7 +202,6 @@ summary.binlgmm <- function(object, ...){
 #' @export
 print.summary.binlgmm <- function(x,
                                   digits = max(3, getOption("digits") - 2),
-                                  width = getOption("width"),
                                   ...)
 {
   cat("        ------------------------------------------------------------\n")
