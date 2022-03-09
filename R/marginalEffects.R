@@ -230,17 +230,17 @@ dydx.bingmm <- function(coeff, object, het = TRUE, atmeans = FALSE, approximatio
 }
 
 ### From spatialprobit
-makeTraces <- function(W, o = 100, iiter = 50) 
-{
-  n <- nrow(W)
-  trW_i <- matrix(data = 0, nrow = n, ncol = o)
-  u <- matrix(rnorm(n * iiter), nrow = n, ncol = iiter)
-  xx <- u
-  trW_i[, 1] <- apply(u * as.matrix(xx), 1, sum)
-  for (i in 2:o) {
-    xx <- W %*% xx
-    trW_i[, i] <- apply(u * as.matrix(xx), 1, sum)
-  }
-  trW_i <- trW_i/iiter
-  return(trW_i)
-}
+# makeTraces <- function(W, o = 100, iiter = 50) 
+# {
+#   n <- nrow(W)
+#   trW_i <- matrix(data = 0, nrow = n, ncol = o)
+#   u <- matrix(rnorm(n * iiter), nrow = n, ncol = iiter)
+#   xx <- u
+#   trW_i[, 1] <- apply(u * as.matrix(xx), 1, sum)
+#   for (i in 2:o) {
+#     xx <- W %*% xx
+#     trW_i[, i] <- apply(u * as.matrix(xx), 1, sum)
+#   }
+#   trW_i <- trW_i/iiter
+#   return(trW_i)
+# }
