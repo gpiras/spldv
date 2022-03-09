@@ -2,11 +2,12 @@
 % Please edit documentation in R/sbinaryLGMM.R
 \name{sbinaryLGMM}
 \alias{sbinaryLGMM}
+\alias{coef.binlgmm}
 \alias{vcov.binlgmm}
 \alias{print.binlgmm}
 \alias{summary.binlgmm}
 \alias{print.summary.binlgmm}
-\title{Estimation of SAR for binary models using Linearized GMM for either Probit or Logit models.}
+\title{Estimation of SAR for binary models using Linearized GMM.}
 \usage{
 sbinaryLGMM(
   formula,
@@ -17,6 +18,8 @@ sbinaryLGMM(
   ...
 )
 
+\method{coef}{binlgmm}(object, ...)
+
 \method{vcov}{binlgmm}(object, ...)
 
 \method{print}{binlgmm}(x, digits = max(3, getOption("digits") - 3), ...)
@@ -26,15 +29,15 @@ sbinaryLGMM(
 \method{print}{summary.binlgmm}(x, digits = max(3, getOption("digits") - 2), ...)
 }
 \arguments{
-\item{formula}{a symbolic description of the model of the form \code{y ~ x | x} where \code{y} is the binary dependent variable, \code{x} are the independent variables. The variables after \code{|} are those variables that enter spatially lagged: WX.}
+\item{formula}{a symbolic description of the model of the form \code{y ~ x | wx} where \code{y} is the binary dependent variable, \code{x} are the independent variables. The variables after \code{|} are those variables that enter spatially lagged: \eqn{WX}. The variables in the second part of \code{formula} must also appear in the first part.}
 
 \item{data}{the data of class \code{data.frame}.}
 
-\item{listw}{a \code{listw} object.}
+\item{listw}{object. An object of class \code{listw}, \code{matrix}, or \code{Matrix}.}
 
-\item{nins}{order of instrumental-variable approximation; as default \code{nins = 2}, such that \eqn{H = (X, WX, W^2X)} are used as instruments.}
+\item{nins}{numerical. Order of instrumental-variable approximation; as default \code{nins = 2}, such that \eqn{H = (Z, WZ, W^2Z)} are used as instruments.}
 
-\item{link}{the assumption of the distribution of the error term; it can be either \code{link = "probit"} (the default) or \code{link = "logit"}.}
+\item{link}{string. The assumption of the distribution of the error term; it can be either \code{link = "probit"} (the default) or \code{link = "logit"}.}
 
 \item{...}{additional arguments.}
 
@@ -42,6 +45,59 @@ sbinaryLGMM(
 
 \item{digits}{the number of digits}
 }
-\description{
-Estimation of SAR for binary models using Linearized GMM for either Probit or Logit models.
+\value{
+An object of class ``\code{bingmm}'', a list with elements:
+\item{coefficients}{the estimated coefficients,}
+\item{call}{the matched call,}
+\item{X}{the X matrix, which contains also WX if the second part of the \code{formula} is used, }
+\item{H}{the H matrix of instruments used,}
+\item{y}{the dependent variable,}
+\item{listw}{the spatial weight matrix,}
+\item{link}{the string indicating the distribution of the error term,}
+\item{fit}{an object of \code{lm} representing the T2SLS,}
+\item{formula}{the formula.}
 }
+\description{
+Estimation of SAR model for binary dependent variables (either Probit or Logit), using Linearized GMM estimator suggested by Klier and McMillen (2008). The model is: 
+
+\deqn{
+y^*= X\beta + WX\gamma + \lambda W y^* + \epsilon = Z\delta + \lambda Wy^{*} + \epsilon
+}
+where  \eqn{y = 1} if \eqn{y^*>0} and 0 otherwise; \eqn{\epsilon \sim N(0, 1)} if \code{link = "probit"} or \eqn{\epsilon \sim L(0, \pi^2/3)} \code{link = "logit"}.
+}
+\details{
+The steps for the linearized spatial Probit/Logit model are the following:
+
+1. Estimate the model by standard Probit/Logit model, in which spatial autocorrelation and heteroskedasticity are ignored. The estimated values are \eqn{\beta_0}. Calculate the generalized residuals assuming that \eqn{\lambda = 0} and the gradient terms \eqn{G_{\beta}} and \eqn{G_{\lambda}}.
+
+2. The second step is a two-stage least squares estimator of the linearized model. Thus regress \eqn{G_{\beta}} and \eqn{G_{\lambda}} on \eqn{H = (Z, WZ, W^2Z, ...., W^qZ)} and obtain the predicted values \eqn{\hat{G}}. Then regress \eqn{u_0 + G_{\beta}'\hat{\beta}_0} on \eqn{\hat{G}}. The coefficients are the estimated values of \eqn{\beta} and \eqn{\lambda}.  
+
+The variance-covariance matrix can be computed using the traditional White-corrected coefficient covariance matrix from the last two-stage least squares estimator of the linearlized model.
+}
+\examples{
+\dontrun{
+# Data set
+data(oldcol, package = "spdep")
+
+# Create dependent (dummy) variable
+COL.OLD$CRIMED <- as.numeric(COL.OLD$CRIME > 35)
+
+# LGMM for probit using q = 3 for instruments
+lgmm <- sbinaryLGMM(CRIMED ~ INC + HOVAL | INC,
+                link  = "probit", 
+                listw = spdep::nb2listw(COL.nb, style = "W"),
+                nins  = 3, 
+                data  = COL.OLD)
+summary(lgmm)
+}                 
+}
+\references{
+Klier, T., & McMillen, D. P. (2008). Clustering of auto supplier plants in the United States: generalized method of moments spatial logit for large samples. Journal of Business & Economic Statistics, 26(4), 460-471.
+}
+\seealso{
+\code{\link[spldv]{sbinaryGMM}}, \code{\link[spldv]{effect.bingmm}}.
+}
+\author{
+Mauricio Sarrias and Gianfranco Piras.
+}
+\keyword{models}

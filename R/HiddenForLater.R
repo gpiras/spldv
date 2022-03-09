@@ -1,10 +1,5 @@
 ### Ris simulator  ----
-
-#' Estimation of SAR for binary models using RIS
-#' 
-#' @name sbinaryRis
-#' @import Matrix maxLik stats spatialreg
-#' @export 
+# To be exported later
 sbinaryRis <- function(formula, data, subset, na.action, 
                         listw = NULL, 
                         R = 1000, # Number of draws
@@ -157,18 +152,7 @@ halton <- function(prime = 3, length = 100, drop = 10){
   halt[(drop + 1):(length + drop)]
 }
 
-#' Get Model Summaries for use with "mtable" for objects of class maxLik
-#' 
-#' A generic function to collect coefficients and summary statistics from a \code{maxLik} object. It is used in \code{mtable}
-#' 
-#' @param obj a \code{maxLik} object,
-#' @param alpha level of the confidence intervals,
-#' @param ... further arguments,
-#' 
-#' @details For more details see package \pkg{memisc}.
-#' @import stats
-#' @importFrom memisc getSummary
-#' @export 
+
 getSummary.maxLik <- function(obj, alpha = 0.05, ...){
   smry <- summary(obj)$estimate
   coef <- smry

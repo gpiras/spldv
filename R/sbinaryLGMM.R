@@ -1,17 +1,67 @@
 ##### Functions for sbinaryLGMM ####
 
-#' Estimation of SAR for binary models using Linearized GMM for either Probit or Logit models. 
+#' @title Estimation of SAR for binary models using Linearized GMM.
+#' @description Estimation of SAR model for binary dependent variables (either Probit or Logit), using Linearized GMM estimator suggested by Klier and McMillen (2008). The model is: 
+#' 
+#' \deqn{
+#' y^*= X\beta + WX\gamma + \lambda W y^* + \epsilon = Z\delta + \lambda Wy^{*} + \epsilon
+#' }
+#' where  \eqn{y = 1} if \eqn{y^*>0} and 0 otherwise; \eqn{\epsilon \sim N(0, 1)} if \code{link = "probit"} or \eqn{\epsilon \sim L(0, \pi^2/3)} \code{link = "logit"}.
 #' 
 #' @name sbinaryLGMM
-#' @param formula a symbolic description of the model of the form \code{y ~ x | x} where \code{y} is the binary dependent variable, \code{x} are the independent variables. The variables after \code{|} are those variables that enter spatially lagged: WX.
+#' @param formula a symbolic description of the model of the form \code{y ~ x | wx} where \code{y} is the binary dependent variable, \code{x} are the independent variables. The variables after \code{|} are those variables that enter spatially lagged: \eqn{WX}. The variables in the second part of \code{formula} must also appear in the first part. 
 #' @param data the data of class \code{data.frame}.
-#' @param listw a \code{listw} object.  
-#' @param nins order of instrumental-variable approximation; as default \code{nins = 2}, such that \eqn{H = (X, WX, W^2X)} are used as instruments.  
-#' @param link the assumption of the distribution of the error term; it can be either \code{link = "probit"} (the default) or \code{link = "logit"}. 
+#' @param listw object. An object of class \code{listw}, \code{matrix}, or \code{Matrix}.  
+#' @param nins numerical. Order of instrumental-variable approximation; as default \code{nins = 2}, such that \eqn{H = (Z, WZ, W^2Z)} are used as instruments.  
+#' @param link string. The assumption of the distribution of the error term; it can be either \code{link = "probit"} (the default) or \code{link = "logit"}. 
 #' @param x,object, an object of class \code{binlgmm}.
 #' @param digits the number of digits
 #' @param ... additional arguments.
-#' @import Matrix car stats spatialreg methods
+#' @details 
+#' 
+#' The steps for the linearized spatial Probit/Logit model are the following:
+#'
+#' 1. Estimate the model by standard Probit/Logit model, in which spatial autocorrelation and heteroskedasticity are ignored. The estimated values are \eqn{\beta_0}. Calculate the generalized residuals assuming that \eqn{\lambda = 0} and the gradient terms \eqn{G_{\beta}} and \eqn{G_{\lambda}}.
+#' 
+#' 2. The second step is a two-stage least squares estimator of the linearized model. Thus regress \eqn{G_{\beta}} and \eqn{G_{\lambda}} on \eqn{H = (Z, WZ, W^2Z, ...., W^qZ)} and obtain the predicted values \eqn{\hat{G}}. Then regress \eqn{u_0 + G_{\beta}'\hat{\beta}_0} on \eqn{\hat{G}}. The coefficients are the estimated values of \eqn{\beta} and \eqn{\lambda}.  
+#' 
+#' The variance-covariance matrix can be computed using the traditional White-corrected coefficient covariance matrix from the last two-stage least squares estimator of the linearlized model. 
+#' @examples
+#' \dontrun{
+#' # Data set
+#' data(oldcol, package = "spdep")
+#' 
+#' # Create dependent (dummy) variable
+#' COL.OLD$CRIMED <- as.numeric(COL.OLD$CRIME > 35)
+#' 
+#' # LGMM for probit using q = 3 for instruments
+#' lgmm <- sbinaryLGMM(CRIMED ~ INC + HOVAL | INC,
+#'                 link  = "probit", 
+#'                 listw = spdep::nb2listw(COL.nb, style = "W"),
+#'                 nins  = 3, 
+#'                 data  = COL.OLD)
+#' summary(lgmm)
+#'}                 
+#' @author Mauricio Sarrias and Gianfranco Piras. 
+#' @keywords models
+#' @return An object of class ``\code{bingmm}'', a list with elements:
+#' \item{coefficients}{the estimated coefficients,}
+#' \item{call}{the matched call,}
+#' \item{X}{the X matrix, which contains also WX if the second part of the \code{formula} is used, }
+#' \item{H}{the H matrix of instruments used,}
+#' \item{y}{the dependent variable,}
+#' \item{listw}{the spatial weight matrix,}
+#' \item{link}{the string indicating the distribution of the error term,}
+#' \item{fit}{an object of \code{lm} representing the T2SLS,}
+#' \item{formula}{the formula.}
+#' @references 
+#
+#' Klier, T., & McMillen, D. P. (2008). Clustering of auto supplier plants in the United States: generalized method of moments spatial logit for large samples. Journal of Business & Economic Statistics, 26(4), 460-471.
+#' 
+#' @seealso \code{\link[spldv]{sbinaryGMM}}, \code{\link[spldv]{effect.bingmm}}.
+#' @rawNamespace import(Matrix,  except = c(cov2cor, toeplitz, update))
+#' @import stats methods Formula
+#' @importFrom sphet listw2dgCMatrix
 #' @export 
 sbinaryLGMM <- function(formula, data, 
                         listw = NULL, 
@@ -22,9 +72,11 @@ sbinaryLGMM <- function(formula, data,
   # Based on McMillen's code 
   link  <- match.arg(link)
   
-  # Spatial weight matrix
-  if (!inherits(listw, "listw")) stop("No neighbourhood list")
-  listw       <- as(listw, "CsparseMatrix")
+  # Spatial weight matrix (W): as CsparseMatrix
+  if(!inherits(listw,c("listw", "Matrix", "matrix"))) stop("Neighbourhood list or listw format unknown")
+  if(inherits(listw,"listw"))   W    <- sphet::listw2dgCMatrix(listw)	
+  if(inherits(listw,"matrix"))  W    <- Matrix(listw)	
+  if(inherits(listw,"Matrix"))  W    <- listw	
   
   # Model frame
   callT    <- match.call(expand.dots = TRUE)
@@ -33,43 +85,45 @@ sbinaryLGMM <- function(formula, data,
   m        <- match(c("formula", "data"), names(mf), 0L)
   mf       <- mf[c(1L, m)]
   f1       <- Formula(formula)
-  #Check if there exists WX variables 
-  if (length(f1)[2L] == 2L) mixed <- TRUE else mixed <- FALSE 
+  if (length(f1)[2L] == 2L) Durbin <- TRUE else Durbin <- FALSE 
   mf$formula <- f1 
   mf[[1L]] <- as.name("model.frame")
   mf       <- eval(mf, parent.frame())
   nframe   <- length(sys.calls())
   
-  # Get variables and checks
+  # Get variables and run some checks
   y  <- model.response(mf)
   if (any(is.na(y))) stop("NAs in dependent variable")
   if (!all(y %in% c(0, 1, TRUE, FALSE))) stop("All dependent variables must be either 0, 1, TRUE or FALSE")
   if (!is.numeric(y)) y <- as.numeric(y)
   X  <- model.matrix(f1, data = mf, rhs = 1)
-  if (mixed){
-    x.for.w <- model.matrix(f1, data = mf, rhs = 2)
-    name.wx <- colnames(x.for.w)
-    WX      <- crossprod(t(listw), x.for.w)
-    name.wx <- name.wx[which(name.wx != "(Intercept)")]
-    WX      <- WX[, name.wx, drop = FALSE]
-    #colnames(WX) <- paste("W", name.wx, sep = "_")
-    colnames(WX) <- paste0("W.", name.wx)
+  if (Durbin){
+    x.for.w  <- model.matrix(f1, data = mf, rhs = 2)
+    name.wx  <- colnames(x.for.w)
+    ## Check variables are in the first part of formula
+    check.wx <- !(name.wx %in% colnames(X))
+    if (sum(check.wx) > 0) stop("Some variables in WX do not appear in X. Check the formula")
+    WX           <- crossprod(t(W), x.for.w)
+    name.wx      <- name.wx[which(name.wx != "(Intercept)")]
+    WX           <- WX[, name.wx, drop = FALSE] # Delete the constant from the WX
+    colnames(WX) <- paste0("lag_", name.wx)
     if (any(is.na(WX))) stop("NAs in WX variable")
     X <- cbind(X, WX)
   }
-  if (any(is.na(X))) stop("NAs in dependent variables")
+  if (any(is.na(X))) stop("NAs in independent variables")
   N  <- nrow(X)
   K  <- ncol(X)
-  sn <- nrow(listw)
+  sn <- nrow(W)
   if (N != sn) stop("Number of spatial units in W is different to the number of data")
   
   ## Generate initial instruments
-  Z <- make.instruments(listw, x = X, q = nins)
+  Z <- make.instruments(W, x = X, q = nins)
   H <- cbind(X, Z)
   # Let linearly independent columns
   H <- H[, qr(H)$pivot[seq_len(qr(H)$rank)]]
   P <- ncol(H)
   if (P < K) stop("Underspecified model")
+  if (any(is.na(H))) stop("NAs in the instruments")
   
   ## Starting values
   sbinary <- glm(y ~ as.matrix(X) - 1, family = binomial(link = link), data = mf)
@@ -95,9 +149,9 @@ sbinaryLGMM <- function(formula, data,
   grad <- -1 * as.vector(q^2 * ((ffa * Fa - fa^2) / (Fa^2))) # Common vector of the derivative
   #grad  <- as.vector(u0 * (u0 + ai))
   Gb    <- grad * X
-  Grho  <- grad * crossprod(t(listw), ai)
+  Glam  <- grad * crossprod(t(W), ai)
   #Grho  <- grad * (W %*% ai)
-  G     <- cbind(Gb, Grho)
+  G     <- cbind(Gb, Glam)
   
   # Second step
   Ghat <- H %*% solve(crossprod(H)) %*% crossprod(H, G) #Predicted values of G
@@ -105,7 +159,7 @@ sbinaryLGMM <- function(formula, data,
   #epsilon <- u0 + Gb %*% b_init
   fit <- lm(epsilon ~ as.matrix(Ghat) + 0)
   bhat <- coef(fit)
-  names(bhat) <- c(colnames(X), "rho") 
+  names(bhat) <- c(colnames(X), "lambda") 
   
   ## Saving results
   out <- structure(
@@ -115,22 +169,30 @@ sbinaryLGMM <- function(formula, data,
       X            = X, 
       H            = H, 
       y            = y, 
-      listw        = listw,
+      listw        = W,
       link         = link, 
-      fit          = fit
+      fit          = fit, 
+      formula     = f1
     ), 
     class = "binlgmm"
   )
   out
 }
 
-#### S3 methods
+#### S3 methods ----
+#' @rdname sbinaryLGMM
+#' @export
+coef.binlgmm <- function(object, ...){
+  object$coefficients
+}
+
+
 #' @rdname sbinaryLGMM
 #' @method vcov binlgmm
-#' @import stats
+#' @importFrom car hccm
 #' @export 
 vcov.binlgmm <- function(object, ...){
-  V <- hccm(object$fit)
+  V <- car::hccm(object$fit)
   colnames(V) <- rownames(V) <- names(coef(object$fit))
   return(V)
 }
@@ -144,7 +206,6 @@ vcov.binlgmm <- function(object, ...){
 #' @param ... further arguments,
 #' 
 #' @details For more details see package \pkg{memisc}.
-#' @import stats
 #' @importFrom memisc getSummary
 #' @export 
 getSummary.binlgmm <- function(obj, alpha = 0.05, ...){
@@ -164,7 +225,6 @@ getSummary.binlgmm <- function(obj, alpha = 0.05, ...){
 
 #' @rdname sbinaryLGMM
 #' @method print binlgmm
-#' @import stats
 #' @export 
 print.binlgmm <- function(x, 
                           digits = max(3, getOption("digits") - 3),
@@ -181,7 +241,6 @@ print.binlgmm <- function(x,
 
 #' @rdname sbinaryLGMM
 #' @method summary binlgmm
-#' @import stats
 #' @export
 summary.binlgmm <- function(object, ...){
   b <- coef(object$fit)
@@ -198,7 +257,6 @@ summary.binlgmm <- function(object, ...){
 
 #' @rdname sbinaryLGMM
 #' @method print summary.binlgmm
-#' @import stats
 #' @export
 print.summary.binlgmm <- function(x,
                                   digits = max(3, getOption("digits") - 2),
