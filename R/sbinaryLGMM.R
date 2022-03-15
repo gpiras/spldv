@@ -1,4 +1,4 @@
-##### Functions for sbinaryLGMM ####
+##### Functions for sbinaryLGMM #####
 
 #' @title Estimation of SAR for binary models using Linearized GMM.
 #' @description Estimation of SAR model for binary dependent variables (either Probit or Logit), using Linearized GMM estimator suggested by Klier and McMillen (2008). The model is: 
