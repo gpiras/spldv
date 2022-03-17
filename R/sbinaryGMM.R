@@ -143,6 +143,7 @@
 #' 
 #' LeSage, J. P., Kelley Pace, R., Lam, N., Campanella, R., & Liu, X. (2011). New Orleans business recovery in the aftermath of Hurricane Katrina. Journal of the Royal Statistical Society: Series A (Statistics in Society), 174(4), 1007-1027.
 #' 
+#' Piras, G., & Sarrias, M. (2022). One or Two-Step? Evaluating GMM Efficiency for Spatial Binary Probit Models. Manuscript submitted for publication. 
 #' @seealso \code{\link[spldv]{sbinaryLGMM}}, \code{\link[spldv]{effect.bingmm}}.
 #' @keywords models
 #' @rawNamespace import(Matrix,  except = c(cov2cor, toeplitz, update)) 
