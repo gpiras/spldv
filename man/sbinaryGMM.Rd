@@ -144,7 +144,7 @@ This matrix is computed using the residuals or generalized residuals from the fi
   \eqn{\hat{S} = n^{-1}\sum_{i = 1}^n \hat{v}_ih_ih_i'}, where \eqn{\hat{v}} are the first-step generalized residuals.
 }
 \examples{
-\dontrun{
+\donttest{
 # Data set
 data(oldcol, package = "spdep")
 

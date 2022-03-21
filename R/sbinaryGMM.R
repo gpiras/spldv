@@ -75,7 +75,7 @@
 #' \item{pw}{the powers for the approximation,}
 #' \item{formula}{the formula.}
 #' @examples
-#' \dontrun{
+#' \donttest{
 #' # Data set
 #' data(oldcol, package = "spdep")
 #' 
@@ -616,6 +616,7 @@ print.summary.bingmm <- function(x,
 #' @param ... further arguments,
 #' 
 #' @details For more details see package \pkg{memisc}.
+#' @return A list with an array with coefficient estimates and a vector containing the model summary statistics. 
 #' @importFrom memisc getSummary
 #' @export 
 getSummary.bingmm <- function(obj, alpha = 0.05, vce = c("robust", "efficient", "ml"), method = "bhhh", R = 1000, ...){

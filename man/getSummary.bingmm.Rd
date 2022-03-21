@@ -26,6 +26,9 @@
 
 \item{...}{further arguments,}
 }
+\value{
+A list with an array with coefficient estimates and a vector containing the model summary statistics.
+}
 \description{
 A generic function to collect coefficients and summary statistics from a \code{bingmm} object. It is used in \code{mtable}
 }
