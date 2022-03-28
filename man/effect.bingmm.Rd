@@ -82,7 +82,7 @@ We implement these three summary measures: (1) The average total effects, \eqn{A
 The standard errors of the average total, direct and indirect effects can be estimated using either Monte Carlo (MC) approximation, which takes into account the sampling distribution of \eqn{\theta}, or Delta Method.
 }
 \examples{
-\dontrun{
+\donttest{
 # Data set
 data(oldcol, package = "spdep")
 

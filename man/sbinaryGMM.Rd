@@ -144,7 +144,7 @@ This matrix is computed using the residuals or generalized residuals from the fi
   \eqn{\hat{S} = n^{-1}\sum_{i = 1}^n \hat{v}_ih_ih_i'}, where \eqn{\hat{v}} are the first-step generalized residuals.
 }
 \examples{
-\dontrun{
+\donttest{
 # Data set
 data(oldcol, package = "spdep")
 
@@ -211,6 +211,8 @@ Fleming, M. M. (2004). Techniques for estimating spatially dependent discrete ch
 Klier, T., & McMillen, D. P. (2008). Clustering of auto supplier plants in the United States: generalized method of moments spatial logit for large samples. Journal of Business & Economic Statistics, 26(4), 460-471.
 
 LeSage, J. P., Kelley Pace, R., Lam, N., Campanella, R., & Liu, X. (2011). New Orleans business recovery in the aftermath of Hurricane Katrina. Journal of the Royal Statistical Society: Series A (Statistics in Society), 174(4), 1007-1027.
+
+Piras, G., & Sarrias, M. (2022). One or Two-Step? Evaluating GMM Efficiency for Spatial Binary Probit Models. Manuscript submitted for publication.
 }
 \seealso{
 \code{\link[spldv]{sbinaryLGMM}}, \code{\link[spldv]{effect.bingmm}}.

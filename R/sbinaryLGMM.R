@@ -27,7 +27,6 @@
 #' 
 #' The variance-covariance matrix can be computed using the traditional White-corrected coefficient covariance matrix from the last two-stage least squares estimator of the linearlized model. 
 #' @examples
-#' \dontrun{
 #' # Data set
 #' data(oldcol, package = "spdep")
 #' 
@@ -41,7 +40,6 @@
 #'                 nins  = 3, 
 #'                 data  = COL.OLD)
 #' summary(lgmm)
-#'}                 
 #' @author Mauricio Sarrias and Gianfranco Piras. 
 #' @keywords models
 #' @return An object of class ``\code{bingmm}'', a list with elements:
@@ -206,6 +204,7 @@ vcov.binlgmm <- function(object, ...){
 #' @param ... further arguments,
 #' 
 #' @details For more details see package \pkg{memisc}.
+#' @return A list with an array with coefficient estimates and a vector containing the model summary statistics. 
 #' @importFrom memisc getSummary
 #' @export 
 getSummary.binlgmm <- function(obj, alpha = 0.05, ...){

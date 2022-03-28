@@ -75,7 +75,6 @@ The steps for the linearized spatial Probit/Logit model are the following:
 The variance-covariance matrix can be computed using the traditional White-corrected coefficient covariance matrix from the last two-stage least squares estimator of the linearlized model.
 }
 \examples{
-\dontrun{
 # Data set
 data(oldcol, package = "spdep")
 
@@ -89,7 +88,6 @@ lgmm <- sbinaryLGMM(CRIMED ~ INC + HOVAL | INC,
                 nins  = 3, 
                 data  = COL.OLD)
 summary(lgmm)
-}                 
 }
 \references{
 Klier, T., & McMillen, D. P. (2008). Clustering of auto supplier plants in the United States: generalized method of moments spatial logit for large samples. Journal of Business & Economic Statistics, 26(4), 460-471.

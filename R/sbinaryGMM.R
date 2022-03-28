@@ -75,7 +75,7 @@
 #' \item{pw}{the powers for the approximation,}
 #' \item{formula}{the formula.}
 #' @examples
-#' \dontrun{
+#' \donttest{
 #' # Data set
 #' data(oldcol, package = "spdep")
 #' 
@@ -143,6 +143,7 @@
 #' 
 #' LeSage, J. P., Kelley Pace, R., Lam, N., Campanella, R., & Liu, X. (2011). New Orleans business recovery in the aftermath of Hurricane Katrina. Journal of the Royal Statistical Society: Series A (Statistics in Society), 174(4), 1007-1027.
 #' 
+#' Piras, G., & Sarrias, M. (2022). One or Two-Step? Evaluating GMM Efficiency for Spatial Binary Probit Models. Manuscript submitted for publication. 
 #' @seealso \code{\link[spldv]{sbinaryLGMM}}, \code{\link[spldv]{effect.bingmm}}.
 #' @keywords models
 #' @rawNamespace import(Matrix,  except = c(cov2cor, toeplitz, update)) 
@@ -615,6 +616,7 @@ print.summary.bingmm <- function(x,
 #' @param ... further arguments,
 #' 
 #' @details For more details see package \pkg{memisc}.
+#' @return A list with an array with coefficient estimates and a vector containing the model summary statistics. 
 #' @importFrom memisc getSummary
 #' @export 
 getSummary.bingmm <- function(obj, alpha = 0.05, vce = c("robust", "efficient", "ml"), method = "bhhh", R = 1000, ...){
