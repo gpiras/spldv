@@ -201,7 +201,7 @@ sbinaryGMM <- function(formula,
   
   # Optimization default controls if not added
   if (is.null(callT$method)) callT$method  <- 'bfgs'
-  if (is.null(callT$iterlm)) callT$iterlim <- 10000
+  if (is.null(callT$iterlim)) callT$iterlim <- 10000
   # if (is.null(callT$reltol)) callT$reltol  <- 1e-7
   if (is.null(callT$reltol)) callT$reltol  <- 1e-6
   callT$finalHessian <- FALSE # We do not require the Hessian. This speeds the optimization procedure. 
@@ -243,7 +243,8 @@ sbinaryGMM <- function(formula,
   ## Starting values for optimization of GMM
   if (is.null(start)){
     # Initial values from probit model for beta
-    sbinary      <- glm(y ~ as.matrix(X) - 1, family = binomial(link = link), data = mf)
+    #sbinary      <- glm(y ~ as.matrix(X) - 1, family = binomial(link = link), data = mf)
+    sbinary      <- glm.fit(as.matrix(X), y, family = binomial(link = link))
     b_init       <- sbinary$coef
     Wy           <- as.numeric(crossprod(t(W), y))
     lambda.init  <- cor(y, Wy)
@@ -264,9 +265,10 @@ sbinaryGMM <- function(formula,
     sym          <- all(W == t(W))
     omega        <- eigen(W, only.values = TRUE, symmetric = sym)
     lambda_space <- if (is.complex(omega$values)) 1 / range(Re(omega$values)) else 1 / range(omega$values)
+    # A %*% theta + B >= 0 
     A <- rbind(c(rep(0, K), 1), 
                c(rep(0, K), -1))  # Matrix of restrictions. See help(maxLik)
-    B <- cbind(c(abs(lambda_space[1] + .Machine$double.eps), abs(lambda_space[2] + .Machine$double.eps)))
+    B <- cbind(c(-1* (lambda_space[1] + .Machine$double.eps), lambda_space[2] - .Machine$double.eps))
     callT$constraints <- list(ineqA = A, ineqB = B)
   }
   
