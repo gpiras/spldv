@@ -215,7 +215,7 @@ LeSage, J. P., Kelley Pace, R., Lam, N., Campanella, R., & Liu, X. (2011). New O
 Piras, G., & Sarrias, M. (2022). One or Two-Step? Evaluating GMM Efficiency for Spatial Binary Probit Models. Manuscript submitted for publication.
 }
 \seealso{
-\code{\link[spldv]{sbinaryLGMM}}, \code{\link[spldv]{effect.bingmm}}.
+\code{\link[spldv]{sbinaryLGMM}}, \code{\link[spldv]{impacts.bingmm}}.
 }
 \author{
 Mauricio Sarrias and Gianfranco Piras.
