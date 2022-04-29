@@ -1,11 +1,24 @@
-### Marginal Effects ----
+### Marginal Effects (Impacts) ----
 
-#' @name effect.bingmm
+#' @title Estimation of the average marginal effects for SARB models.
+#' 
+#' @description Obtain the average marginal effects from \code{bingmm} or \code{binlgmm} class model.
+#' @param object an object of class \code{bingmm} or \code{binlgmm}
+#' @param ... Additional arguments to be passed.
+#' 
+#' @return Estimates of the direct, indirect and total effect.
+#' @export
+#' @rawNamespace import(spatialreg,  except = c(impacts)) 
+impacts <- function(object, ...){
+  UseMethod("impacts", object)
+}
+
+
 #' @title Estimation of the average marginal effects for SARB model estimated using GMM procedures.
 #' 
 #' @description Obtain the average marginal effects from \code{bingmm} or \code{binlgmm} class model.
 #' 
-#' @param object an object of class \code{bingmm}, \code{binlgmm}, or \code{effect.bingmm} for \code{summary} and \code{print} method. 
+#' @param object an object of class \code{bingmm}, \code{binlgmm}, or \code{impacts.bingmm} for \code{summary} and \code{print} method. 
 #' @param vcov an estimate of the asymptotic variance-covariance matrix of the parameters for a \code{bingmm} or \code{binlgmm} object.
 #' @param vce string indicating what kind of variance-covariance matrix of the estimate should be computed when using \code{effect.bingmm}. For the one-step GMM estimator, the options are \code{"robust"} and \code{"ml"}. For the two-step GMM estimator, the options are \code{"robust"}, \code{"efficient"} and \code{"ml"}. The option \code{"vce = ml"} is an exploratory method that evaluates the VC of the RIS estimator using the GMM estimates.
 #' @param het logical. If \code{TRUE} (the default), then the heteroskedasticity is taken into account when computing the average marginal effects. 
@@ -18,7 +31,7 @@
 #' @param empirical logical. Argument passed to \code{mvrnorm} (default \code{FALSE}): if \code{TRUE}, the coefficients and their covariance matrix specify the empirical not population mean and covariance matrix
 #' @param digits the number of digits.
 #' @param ... further arguments. Ignored.
-#' @param x an object of class \code{effect.bingmm}.
+#' @param x an object of class \code{impacts.bingmm}.
 #' 
 #' @details 
 #' 
@@ -58,24 +71,25 @@
 #'                 type = "twostep")
 #'                 
 #' # Marginal effects using Delta Method
-#' summary(effect.bingmm(ts, type = "delta"))
+#' summary(impacts(ts, type = "delta"))
 #' 
 #' # Marginal effects using MC with 100 draws
-#' summary(effect.bingmm(ts, type = "mc", R = 100))
+#' summary(impacts(ts, type = "mc", R = 100))
 #' 
 #' # Marginal effects using efficient VC matrix
-#' summary(effect.bingmm(ts, type = "delta", vce = "efficient"))
+#' summary(impacts(ts, type = "delta", vce = "efficient"))
 #' 
 #' # Marginal effects using efficient VC matrix and ignoring the heteroskedasticity
-#' summary(effect.bingmm(ts, type = "delta", vce = "efficient", het = FALSE))
+#' summary(impacts(ts, type = "delta", vce = "efficient", het = FALSE))
 #'}
-#' @return An object of class \code{effect.bingmm}. 
+#' @return An object of class \code{impacts.bingmm}. 
 #' @seealso \code{\link[spldv]{sbinaryGMM}}, \code{\link[spldv]{sbinaryLGMM}}.
 #' @author Mauricio Sarrias and Gianfranco Piras. 
+#' @method impacts bingmm
 #' @importFrom numDeriv jacobian
 #' @importFrom MASS mvrnorm
 #' @export
-effect.bingmm <- function(object,
+impacts.bingmm <- function(object,
                           vcov = NULL,
                           vce = c("robust", "efficient", "ml"), 
                           het = TRUE,
@@ -87,15 +101,15 @@ effect.bingmm <- function(object,
                           tol = 1e-06, 
                           empirical = FALSE,
                           ...){
-  if (!inherits(object, c("binlgmm", "bingmm"))) 
-    stop("use only with \"bingmm\" or \"binlgmm\" objects")
+  #if (!inherits(object, c("binlgmm", "bingmm"))) 
+  #  stop("use only with \"bingmm\" or \"binlgmm\" objects")
   # Type of standard errors
   type  <- match.arg(type)
   vce   <- match.arg(vce)
   
   # Variance covariance matrix
   if (is.null(vcov)){
-    V <- if (inherits(object, "bingmm")) vcov(object, vce = vce) else vcov(object)
+    V <- vcov(object, vce = vce)
   } else {
     V <- vcov
     n.param <- length(coef(object))
@@ -127,24 +141,92 @@ effect.bingmm <- function(object,
   p  <- 2 * pnorm(-abs(z))
   results        <- cbind(`dydx` = me, `Std. error` = se, `z value` = z, `Pr(> z)` = p)
   #object$margins <- results
-  class(results)  <- c("effect.bingmm")
+  class(results)  <- c("impacts.bingmm")
   return(results)
 }
 
-#' @rdname effect.bingmm
-#' @method summary effect.bingmm
+#' @rdname impacts.bingmm
+#' @method impacts binlgmm
+#' @importFrom numDeriv jacobian
+#' @importFrom MASS mvrnorm
 #' @export
-summary.effect.bingmm <- function(object, ...){
+impacts.binlgmm <- function(object,
+                           vcov = NULL,
+                           het = TRUE,
+                           atmeans = FALSE, 
+                           type = c("mc", "delta"), 
+                           R = 100,
+                           approximation = FALSE,
+                           pw  = 5, 
+                           tol = 1e-06, 
+                           empirical = FALSE,
+                           ...){
+  #if (!inherits(object, c("binlgmm", "bingmm"))) 
+  #  stop("use only with \"bingmm\" or \"binlgmm\" objects")
+  # Type of standard errors
+  type  <- match.arg(type)
+
+  # Variance covariance matrix
+  if (is.null(vcov)){
+    V <- vcov(object)
+  } else {
+    V <- vcov
+    n.param <- length(coef(object))
+    if (dim(V)[1L] != n.param | dim(V)[2L] != n.param)  stop("dim of vcov are not the same as the estimated parameters")
+  }
+  mu <- coef(object)
+  
+  # Make effects
+  if (type == "delta"){
+    me <- dydx.bingmm(coeff = mu, object = object, het = het, atmeans = atmeans, approximation = approximation, pw = pw)
+    # Make Jacobian (use numerical jacobian)
+    jac <- numDeriv::jacobian(dydx.bingmm, mu, object = object, het = het, atmeans = atmeans, approximation = approximation, pw = pw)
+    se <- sqrt(diag(jac %*% V %*% t(jac))) 
+  } else {
+    W            <- object$listw
+    sym          <- all(W == t(W))
+    omega        <- eigen(W, only.values = TRUE, symmetric = sym)
+    interval     <- if (is.complex(omega$values)) 1 / range(Re(omega$values)) else 1 / range(omega$values)
+    samples      <- MASS::mvrnorm(n = R, mu = mu, Sigma = V, tol = tol, empirical = empirical)
+    check        <- ((samples[, length(mu)] > interval[1]) & (samples[, length(mu)] < interval[2]))
+    if (any(!check)) samples <- samples[check, ]
+    sres         <- apply(samples, 1, dydx.bingmm, object = object, het = het, atmeans = atmeans, approximation = approximation, pw = pw)
+    me           <- apply(sres, 1, mean)
+    se           <- apply(sres, 1, sd)
+  }
+  
+  # Save results
+  z  <-  me / se
+  p  <- 2 * pnorm(-abs(z))
+  results        <- cbind(`dydx` = me, `Std. error` = se, `z value` = z, `Pr(> z)` = p)
+  #object$margins <- results
+  class(results)  <- c("impacts.bingmm")
+  return(results)
+}
+
+#' @rdname impacts.bingmm
+#' @method print impacts.bingmm
+#' @export
+print.impacts.bingmm <- function(x, ... ){
+  cat("The average total effects are:\n")
+  k <- nrow(x) / 3
+  cat("Estimate(s):", x[1:k, 1], "\n")
+}
+
+#' @rdname impacts.bingmm
+#' @method summary impacts.bingmm
+#' @export
+summary.impacts.bingmm <- function(object, ...){
   CoefTable      <- object
   summary        <- list(CoefTable = CoefTable)
-  class(summary) <- "summary.effect.bingmm"
+  class(summary) <- "summary.impacts.bingmm"
   summary
 }
 
-#' @rdname effect.bingmm
-#' @method print summary.effect.bingmm
+#' @rdname impacts.bingmm
+#' @method print summary.impacts.bingmm
 #' @export
-print.summary.effect.bingmm <- function(x, digits = max(3, getOption("digits") - 3), ...){
+print.summary.impacts.bingmm <- function(x, digits = max(3, getOption("digits") - 3), ...){
   k <- nrow(x$CoefTable) / 3
   cat("------------------------------------------------------", fill = TRUE)
   cat("(a) Total effects :\n")
@@ -228,6 +310,7 @@ dydx.bingmm <- function(coeff, object, het = TRUE, atmeans = FALSE, approximatio
   out <- c(TE, DE, IE)
   return(out)
 }
+
 
 ### From spatialprobit
 # makeTraces <- function(W, o = 100, iiter = 50) 

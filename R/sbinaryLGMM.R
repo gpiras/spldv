@@ -56,7 +56,7 @@
 #
 #' Klier, T., & McMillen, D. P. (2008). Clustering of auto supplier plants in the United States: generalized method of moments spatial logit for large samples. Journal of Business & Economic Statistics, 26(4), 460-471.
 #' 
-#' @seealso \code{\link[spldv]{sbinaryGMM}}, \code{\link[spldv]{effect.bingmm}}.
+#' @seealso \code{\link[spldv]{sbinaryGMM}}, \code{\link[spldv]{impacts.bingmm}}.
 #' @rawNamespace import(Matrix,  except = c(cov2cor, toeplitz, update))
 #' @import stats methods Formula
 #' @importFrom sphet listw2dgCMatrix
@@ -191,7 +191,7 @@ coef.binlgmm <- function(object, ...){
 #' @export 
 vcov.binlgmm <- function(object, ...){
   V <- car::hccm(object$fit)
-  colnames(V) <- rownames(V) <- names(coef(object$fit))
+  colnames(V) <- rownames(V) <- names(coef(object))
   return(V)
 }
 
@@ -206,18 +206,21 @@ vcov.binlgmm <- function(object, ...){
 #' @details For more details see package \pkg{memisc}.
 #' @return A list with an array with coefficient estimates and a vector containing the model summary statistics. 
 #' @importFrom memisc getSummary
+#' @method getSummary binlgmm
 #' @export 
 getSummary.binlgmm <- function(obj, alpha = 0.05, ...){
-  smry <- summary(obj)
-  coef <- smry$Coef
+  if (inherits(obj, c("summary.binlgmm"))){
+    coef <- obj$CoefTable
+  } else {
+    smry <- summary(obj)
+    coef <- smry$Coef
+  }
   lower <- coef[, 1] - coef[, 2] * qnorm(alpha/2)
   upper <- coef[, 1] + coef[, 2] * qnorm(alpha/2)
   coef <- cbind(coef, lower, upper)
   colnames(coef) <- c("est", "se", "stat", "p", "lwr", "upr")
   N <-  nrow(obj$X)
-  sumstat <- c(logLik = NA, deviance = NA, AIC = NA, BIC = NA, N = N, 
-               LR = NA, df = NA, p = NA, Aldrich.Nelson = NA, McFadden = NA, Cox.Snell = NA,
-               Nagelkerke = NA)
+  sumstat <- c(N = N)
   list(coef = coef, sumstat = sumstat, contrasts = obj$contrasts,
        xlevels = NULL, call = obj$call)
 }
@@ -271,7 +274,7 @@ print.summary.binlgmm <- function(x,
   cat("\nCoefficients:\n")
   printCoefmat(x$CoefTable, digits = digits, P.values = TRUE, has.Pvalue = TRUE)
   
-  cat(paste("\nSample size:", signif(nrow(x$X), digits)))
+  cat(paste("\nSample size:", signif(nrow(x$X), digits)), "\n")
   invisible(x)
 }
 

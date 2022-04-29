@@ -144,7 +144,7 @@
 #' LeSage, J. P., Kelley Pace, R., Lam, N., Campanella, R., & Liu, X. (2011). New Orleans business recovery in the aftermath of Hurricane Katrina. Journal of the Royal Statistical Society: Series A (Statistics in Society), 174(4), 1007-1027.
 #' 
 #' Piras, G., & Sarrias, M. (2022). One or Two-Step? Evaluating GMM Efficiency for Spatial Binary Probit Models. Manuscript submitted for publication. 
-#' @seealso \code{\link[spldv]{sbinaryLGMM}}, \code{\link[spldv]{effect.bingmm}}.
+#' @seealso \code{\link[spldv]{sbinaryLGMM}}, \code{\link[spldv]{impacts.bingmm}}.
 #' @keywords models
 #' @rawNamespace import(Matrix,  except = c(cov2cor, toeplitz, update)) 
 #' @import stats methods Formula maxLik
@@ -612,26 +612,29 @@ print.summary.bingmm <- function(x,
 #' 
 #' @param obj a \code{bingmm} object,
 #' @param alpha level of the confidence intervals,
-#' @param vce string indicating what kind of standard errors should be computed when using \code{summary}. For the one-step GMM estimator, the options are \code{"robust"} and \code{"ml"}. For the two-step GMM estimator, the options are \code{"robust"}, \code{"efficient"} and \code{"ml"}. The option \code{"vce = ml"} is an exploratory method that evaluates the VC of the RIS estimator using the GMM estimates.
-#' @param R only valid if \code{vce = "ml"}. It indicates the number of draws used to compute the simulated probability in the RIS estimator.  
-#' @param method only valid if \code{vce = "ml"}. It indicates the algorithm used to compute the Hessian matrix of the RIS estimator. The defult is \code{"bhhh"}.  
 #' @param ... further arguments,
 #' 
 #' @details For more details see package \pkg{memisc}.
 #' @return A list with an array with coefficient estimates and a vector containing the model summary statistics. 
 #' @importFrom memisc getSummary
+#' @method getSummary bingmm
 #' @export 
-getSummary.bingmm <- function(obj, alpha = 0.05, vce = c("robust", "efficient", "ml"), method = "bhhh", R = 1000, ...){
-  smry <- summary(obj, vce, method, R)
-  coef <- smry$Coef
+getSummary.bingmm <- function(obj, alpha = 0.05, ...){
+  if (inherits(obj, c("summary.bingmm"))){
+    coef <- obj$CoefTable
+  } else {
+    smry <- summary(obj)
+    coef <- smry$Coef
+  }
   lower <- coef[, 1] - coef[, 2] * qnorm(alpha/2)
   upper <- coef[, 1] + coef[, 2] * qnorm(alpha/2)
   coef <- cbind(coef, lower, upper)
   colnames(coef) <- c("est", "se", "stat", "p", "lwr", "upr")
   N <-  nrow(obj$X)
-  sumstat <- c(logLik = NA, deviance = NA, AIC = NA, BIC = NA, N = N, 
-               LR = NA, df = NA, p = NA, Aldrich.Nelson = NA, McFadden = NA, Cox.Snell = NA,
-               Nagelkerke = NA)
+  #sumstat <- c(logLik = NA, deviance = NA, AIC = NA, BIC = NA, N = N, 
+  #             LR = NA, df = NA, p = NA, Aldrich.Nelson = NA, McFadden = NA, Cox.Snell = NA,
+  #             Nagelkerke = NA)
+  sumstat <- c(N = N)
   list(coef = coef, sumstat = sumstat, contrasts = obj$contrasts,
        xlevels = NULL, call = obj$call)
 }

@@ -93,7 +93,7 @@ summary(lgmm)
 Klier, T., & McMillen, D. P. (2008). Clustering of auto supplier plants in the United States: generalized method of moments spatial logit for large samples. Journal of Business & Economic Statistics, 26(4), 460-471.
 }
 \seealso{
-\code{\link[spldv]{sbinaryGMM}}, \code{\link[spldv]{effect.bingmm}}.
+\code{\link[spldv]{sbinaryGMM}}, \code{\link[spldv]{impacts.bingmm}}.
 }
 \author{
 Mauricio Sarrias and Gianfranco Piras.
