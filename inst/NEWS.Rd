@@ -7,7 +7,9 @@
     \itemize{
       \item Fixed bug with constrained optimization (JSS). 
       \item Fixed minor bugs with controls for maxLik.
-      \item 
+      \item Improved documentation. 
+      \item Added impacts() function for marginal effects. 
+      \item Added tol.solve for solve function. 
     }
   }  
 }
