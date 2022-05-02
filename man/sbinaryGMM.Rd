@@ -25,6 +25,7 @@ sbinaryGMM(
   verbose = TRUE,
   print.init = FALSE,
   pw = 5,
+  tol.solve = .Machine$double.eps,
   ...
 )
 
@@ -35,6 +36,7 @@ sbinaryGMM(
   vce = c("robust", "efficient", "ml"),
   method = "bhhh",
   R = 1000,
+  tol.solve = .Machine$double.eps,
   ...
 )
 
@@ -45,6 +47,7 @@ sbinaryGMM(
   vce = c("robust", "efficient", "ml"),
   method = "bhhh",
   R = 1000,
+  tol.solve = .Machine$double.eps,
   ...
 )
 
@@ -80,6 +83,8 @@ sbinaryGMM(
 \item{print.init}{logical. If \code{TRUE} the initial parameters used in the optimization of the first step are printed.}
 
 \item{pw}{numeric. The power used for the approximation \eqn{I + \lambda W + \lambda^2 W^2 + \lambda^3 W^3 + ... +\lambda^q W^q}. The default is 5.}
+
+\item{tol.solve}{Tolerance for \code{solve()}.}
 
 \item{...}{additional arguments passed to \code{maxLik}.}
 
