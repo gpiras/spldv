@@ -54,7 +54,7 @@ sbinaryGMM(
 \method{print}{summary.bingmm}(x, digits = max(5, getOption("digits") - 3), ...)
 }
 \arguments{
-\item{formula}{a symbolic description of the model of the form \code{y ~ x | wx} where \code{y} is the binary dependent variable, \code{x} are the independent variables. The variables after \code{|} are those variables that enter spatially lagged: \eqn{WX}. The variables in the second part of \code{formula} must also appear in the first part.}
+\item{formula}{a symbolic description of the model of the form \code{y ~ x | wx} where \code{y} is the binary dependent variable, \code{x} are the independent variables. The variables after \code{|} are those variables that enter spatially lagged: \eqn{WX}. The variables in the second part of \code{formula} must also appear in the first part. This rules out situations in which one of the regressors can be specified only in lagged form.}
 
 \item{data}{the data of class \code{data.frame}.}
 
