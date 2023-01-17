@@ -11,7 +11,7 @@
 #' where  \eqn{y = 1} if \eqn{y^*>0} and 0 otherwise; \eqn{\epsilon \sim N(0, 1)} if \code{link = "probit"} or \eqn{\epsilon \sim L(0, \pi^2/3)} if \code{link = "logit"}.
 #' 
 #' @name sbinaryGMM
-#' @param formula a symbolic description of the model of the form \code{y ~ x | wx} where \code{y} is the binary dependent variable, \code{x} are the independent variables. The variables after \code{|} are those variables that enter spatially lagged: \eqn{WX}. The variables in the second part of \code{formula} must also appear in the first part. 
+#' @param formula a symbolic description of the model of the form \code{y ~ x | wx} where \code{y} is the binary dependent variable, \code{x} are the independent variables. The variables after \code{|} are those variables that enter spatially lagged: \eqn{WX}. The variables in the second part of \code{formula} must also appear in the first part. This rules out situations in which one of the regressors can be specified only in lagged form.
 #' @param data the data of class \code{data.frame}.
 #' @param listw object. An object of class \code{listw}, \code{matrix}, or \code{Matrix}.  
 #' @param nins numerical. Order of instrumental-variable approximation; as default \code{nins = 2}, such that \eqn{H = (Z, WZ, W^2Z)} are used as instruments.  
@@ -359,7 +359,7 @@ app_W <- function(listw, lambda, pw){
 }
 
 # Moment function
-momB_slm <- function(start, y, X, H, listw, link, approximation, pw, tol.solve){
+momB_slm <- function(start, y, X, H, listw, link, approximation, pw, tol.solve = .Machine$double.eps){
   # This function generates: 
   #  (1) generalized residuals
   #  (2) the moment conditions 
