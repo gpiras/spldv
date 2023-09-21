@@ -5,7 +5,8 @@
 \section{CHANGES IN VERSION 0.1.2}{
 \subsection{NEW FEATURES}{
     \itemize{
-      \item Improved documentation. 
+      \item Improved documentation.
+      \item Fixed bug with impacts.
     }
   }  
 }
