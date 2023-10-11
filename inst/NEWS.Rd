@@ -2,6 +2,14 @@
 \title{spldv News}
 \encoding{UTF-8}
 
+\section{CHANGES IN VERSION 0.1.3}{
+\subsection{NEW FEATURES}{
+    \itemize{
+      \item Includes citation for JSS paper.
+    }
+  }  
+}
+
 \section{CHANGES IN VERSION 0.1.2}{
 \subsection{NEW FEATURES}{
     \itemize{
