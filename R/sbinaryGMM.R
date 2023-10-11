@@ -144,7 +144,9 @@
 #' 
 #' LeSage, J. P., Kelley Pace, R., Lam, N., Campanella, R., & Liu, X. (2011). New Orleans business recovery in the aftermath of Hurricane Katrina. Journal of the Royal Statistical Society: Series A (Statistics in Society), 174(4), 1007-1027.
 #' 
-#' Piras, G., & Sarrias, M. (2022). One or Two-Step? Evaluating GMM Efficiency for Spatial Binary Probit Models. Manuscript submitted for publication. 
+#' Piras, G., & Sarrias, M. (2023). One or Two-Step? Evaluating GMM Efficiency for Spatial Binary Probit Models. Journal of choice modelling, 48, 100432. 
+#' 
+#' Piras, G,. & Sarrias, M. (2023). GMM Estimators for Binary Spatial Models in R. Journal of Statistical Software, 107(8), 1-33. 
 #' @seealso \code{\link[spldv]{sbinaryLGMM}}, \code{\link[spldv]{impacts.bingmm}}.
 #' @keywords models
 #' @rawNamespace import(Matrix,  except = c(cov2cor, toeplitz, update)) 

@@ -1,0 +1,17 @@
+bibentry(bibtype = "Article",
+  title        = "{GMM} Estimators for Binary Spatial Models in {R}",
+  author       = c(person(given = "Gianfranco",
+                          family = "Piras",
+                          email = "gpiras@mac.com"),
+                   person(given = "Mauricio",
+                          family = "Sarrias",
+                          email = "mauricio.sarrias@utalca.cl")),
+  journal      = "Journal of Statistical Software",
+  year         = "2023",
+  volume       = "107",
+  number       = "8",
+  pages        = "1--33",
+  doi          = "10.18637/jss.v107.i08",
+  header       = "To cite spldv in publications use:"
+)
+

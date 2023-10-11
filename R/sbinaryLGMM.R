@@ -56,6 +56,9 @@
 #
 #' Klier, T., & McMillen, D. P. (2008). Clustering of auto supplier plants in the United States: generalized method of moments spatial logit for large samples. Journal of Business & Economic Statistics, 26(4), 460-471.
 #' 
+#' Piras, G., & Sarrias, M. (2023). One or Two-Step? Evaluating GMM Efficiency for Spatial Binary Probit Models. Journal of choice modelling, 48, 100432. 
+#' 
+#' Piras, G,. & Sarrias, M. (2023). GMM Estimators for Binary Spatial Models in R. Journal of Statistical Software, 107(8), 1-33. 
 #' @seealso \code{\link[spldv]{sbinaryGMM}}, \code{\link[spldv]{impacts.bingmm}}.
 #' @rawNamespace import(Matrix,  except = c(cov2cor, toeplitz, update))
 #' @import stats methods Formula
