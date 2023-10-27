@@ -2,23 +2,16 @@
 
 #' @title Estimation of the average marginal effects for SARB models.
 #' 
-#' @description Obtain the average marginal effects from \code{bingmm} or \code{binlgmm} class model.
-#' @param object an object of class \code{bingmm} or \code{binlgmm}
-#' @param ... Additional arguments to be passed.
-#' 
-#' @return Estimates of the direct, indirect and total effect.
-#' @export
-#' @rawNamespace import(spatialreg,  except = c(impacts)) 
-impacts <- function(object, ...){
-  UseMethod("impacts", object)
-}
-
-
+#' @aliases impacts
+#' @import spatialreg
+#' @export impacts
 #' @title Estimation of the average marginal effects for SARB model estimated using GMM procedures.
 #' 
 #' @description Obtain the average marginal effects from \code{bingmm} or \code{binlgmm} class model.
 #' 
-#' @param object an object of class \code{bingmm}, \code{binlgmm}, or \code{impacts.bingmm} for \code{summary} and \code{print} method. 
+#' @param obj an object of class \code{bingmm}, \code{binlgmm}.
+#' @param object an object of class \code{impacts.bingmm} for \code{summary} methods.
+#' @param x an object of class \code{impacts.bingmm} for \code{print} methods. 
 #' @param vcov an estimate of the asymptotic variance-covariance matrix of the parameters for a \code{bingmm} or \code{binlgmm} object.
 #' @param vce string indicating what kind of variance-covariance matrix of the estimate should be computed when using \code{effect.bingmm}. For the one-step GMM estimator, the options are \code{"robust"} and \code{"ml"}. For the two-step GMM estimator, the options are \code{"robust"}, \code{"efficient"} and \code{"ml"}. The option \code{"vce = ml"} is an exploratory method that evaluates the VC of the RIS estimator using the GMM estimates.
 #' @param het logical. If \code{TRUE} (the default), then the heteroskedasticity is taken into account when computing the average marginal effects. 
@@ -89,7 +82,7 @@ impacts <- function(object, ...){
 #' @importFrom numDeriv jacobian
 #' @importFrom MASS mvrnorm
 #' @export
-impacts.bingmm <- function(object,
+impacts.bingmm <- function(obj,
                           vcov = NULL,
                           vce = c("robust", "efficient", "ml"), 
                           het = TRUE,
@@ -101,37 +94,35 @@ impacts.bingmm <- function(object,
                           tol = 1e-06, 
                           empirical = FALSE,
                           ...){
-  #if (!inherits(object, c("binlgmm", "bingmm"))) 
-  #  stop("use only with \"bingmm\" or \"binlgmm\" objects")
   # Type of standard errors
   type  <- match.arg(type)
   vce   <- match.arg(vce)
   
   # Variance covariance matrix
   if (is.null(vcov)){
-    V <- vcov(object, vce = vce)
+    V <- vcov(obj, vce = vce)
   } else {
     V <- vcov
-    n.param <- length(coef(object))
+    n.param <- length(coef(obj))
     if (dim(V)[1L] != n.param | dim(V)[2L] != n.param)  stop("dim of vcov are not the same as the estimated parameters")
   }
-  mu <- coef(object)
+  mu <- coef(obj)
   
   # Make effects
   if (type == "delta"){
-    me <- dydx.bingmm(coeff = mu, object = object, het = het, atmeans = atmeans, approximation = approximation, pw = pw)
+    me <- dydx.bingmm(coeff = mu, object = obj, het = het, atmeans = atmeans, approximation = approximation, pw = pw)
     # Make Jacobian (use numerical jacobian)
-    jac <- numDeriv::jacobian(dydx.bingmm, mu, object = object, het = het, atmeans = atmeans, approximation = approximation, pw = pw)
+    jac <- numDeriv::jacobian(dydx.bingmm, mu, object = obj, het = het, atmeans = atmeans, approximation = approximation, pw = pw)
     se <- sqrt(diag(jac %*% V %*% t(jac))) 
   } else {
-    W            <- object$listw
+    W            <- obj$listw
     sym          <- all(W == t(W))
     omega        <- eigen(W, only.values = TRUE, symmetric = sym)
     interval     <- if (is.complex(omega$values)) 1 / range(Re(omega$values)) else 1 / range(omega$values)
     samples      <- MASS::mvrnorm(n = R, mu = mu, Sigma = V, tol = tol, empirical = empirical)
     check        <- ((samples[, length(mu)] > interval[1]) & (samples[, length(mu)] < interval[2]))
     if (any(!check)) samples <- samples[check, ]
-    sres         <- apply(samples, 1, dydx.bingmm, object = object, het = het, atmeans = atmeans, approximation = approximation, pw = pw)
+    sres         <- apply(samples, 1, dydx.bingmm, object = obj, het = het, atmeans = atmeans, approximation = approximation, pw = pw)
     me           <- apply(sres, 1, mean)
     se           <- apply(sres, 1, sd)
   }
@@ -150,7 +141,7 @@ impacts.bingmm <- function(object,
 #' @importFrom numDeriv jacobian
 #' @importFrom MASS mvrnorm
 #' @export
-impacts.binlgmm <- function(object,
+impacts.binlgmm <- function(obj,
                            vcov = NULL,
                            het = TRUE,
                            atmeans = FALSE, 
@@ -161,36 +152,34 @@ impacts.binlgmm <- function(object,
                            tol = 1e-06, 
                            empirical = FALSE,
                            ...){
-  #if (!inherits(object, c("binlgmm", "bingmm"))) 
-  #  stop("use only with \"bingmm\" or \"binlgmm\" objects")
   # Type of standard errors
   type  <- match.arg(type)
 
   # Variance covariance matrix
   if (is.null(vcov)){
-    V <- vcov(object)
+    V <- vcov(obj)
   } else {
     V <- vcov
-    n.param <- length(coef(object))
+    n.param <- length(coef(obj))
     if (dim(V)[1L] != n.param | dim(V)[2L] != n.param)  stop("dim of vcov are not the same as the estimated parameters")
   }
-  mu <- coef(object)
+  mu <- coef(obj)
   
   # Make effects
   if (type == "delta"){
-    me <- dydx.bingmm(coeff = mu, object = object, het = het, atmeans = atmeans, approximation = approximation, pw = pw)
+    me <- dydx.bingmm(coeff = mu, object = obj, het = het, atmeans = atmeans, approximation = approximation, pw = pw)
     # Make Jacobian (use numerical jacobian)
-    jac <- numDeriv::jacobian(dydx.bingmm, mu, object = object, het = het, atmeans = atmeans, approximation = approximation, pw = pw)
+    jac <- numDeriv::jacobian(dydx.bingmm, mu, object = obj, het = het, atmeans = atmeans, approximation = approximation, pw = pw)
     se <- sqrt(diag(jac %*% V %*% t(jac))) 
   } else {
-    W            <- object$listw
+    W            <- obj$listw
     sym          <- all(W == t(W))
     omega        <- eigen(W, only.values = TRUE, symmetric = sym)
     interval     <- if (is.complex(omega$values)) 1 / range(Re(omega$values)) else 1 / range(omega$values)
     samples      <- MASS::mvrnorm(n = R, mu = mu, Sigma = V, tol = tol, empirical = empirical)
     check        <- ((samples[, length(mu)] > interval[1]) & (samples[, length(mu)] < interval[2]))
     if (any(!check)) samples <- samples[check, ]
-    sres         <- apply(samples, 1, dydx.bingmm, object = object, het = het, atmeans = atmeans, approximation = approximation, pw = pw)
+    sres         <- apply(samples, 1, dydx.bingmm, object = obj, het = het, atmeans = atmeans, approximation = approximation, pw = pw)
     me           <- apply(sres, 1, mean)
     se           <- apply(sres, 1, sd)
   }
