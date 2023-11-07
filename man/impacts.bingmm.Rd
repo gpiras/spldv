@@ -2,14 +2,15 @@
 % Please edit documentation in R/marginalEffects.R
 \name{impacts.bingmm}
 \alias{impacts.bingmm}
+\alias{impacts}
 \alias{impacts.binlgmm}
 \alias{print.impacts.bingmm}
 \alias{summary.impacts.bingmm}
 \alias{print.summary.impacts.bingmm}
-\title{Estimation of the average marginal effects for SARB model estimated using GMM procedures.}
+\title{Estimation of the average marginal effects for SARB models.}
 \usage{
 \method{impacts}{bingmm}(
-  object,
+  obj,
   vcov = NULL,
   vce = c("robust", "efficient", "ml"),
   het = TRUE,
@@ -24,7 +25,7 @@
 )
 
 \method{impacts}{binlgmm}(
-  object,
+  obj,
   vcov = NULL,
   het = TRUE,
   atmeans = FALSE,
@@ -44,7 +45,7 @@
 \method{print}{summary.impacts.bingmm}(x, digits = max(3, getOption("digits") - 3), ...)
 }
 \arguments{
-\item{object}{an object of class \code{bingmm}, \code{binlgmm}, or \code{impacts.bingmm} for \code{summary} and \code{print} method.}
+\item{obj}{an object of class \code{bingmm}, \code{binlgmm}.}
 
 \item{vcov}{an estimate of the asymptotic variance-covariance matrix of the parameters for a \code{bingmm} or \code{binlgmm} object.}
 
@@ -69,6 +70,8 @@
 \item{...}{further arguments. Ignored.}
 
 \item{x}{an object of class \code{impacts.bingmm}.}
+
+\item{object}{an object of class \code{impacts.bingmm} for \code{summary} methods.}
 
 \item{digits}{the number of digits.}
 }
