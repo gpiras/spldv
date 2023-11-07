@@ -463,6 +463,16 @@ makeS <- function(b_hat, y, X, H, listw, link, wmatrix, approximation, pw){
 #  return(out)
 #}
 
+
+#' @title Make instruments for spatial models
+#' @name make.instruments
+#' @usage make.instruments(listw, x, q)
+#' @param listw object. An object of class \code{listw}, \code{matrix}, or \code{Matrix}.  
+#' @param x variable(s) to be lagged
+#' @param q number of lags
+#' @author Mauricio Sarrias and Gianfranco Piras. 
+#' @keywords instruments
+#' @export 
 make.instruments <- function(listw, x, q = 3){
   # This function creates the instruments (WX, ...,W^qX) as in K&P
   W <- listw
