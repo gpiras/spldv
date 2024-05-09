@@ -4,6 +4,7 @@
 \alias{impacts.bingmm}
 \alias{impacts}
 \alias{impacts.binlgmm}
+\alias{impacts.binris}
 \alias{print.impacts.bingmm}
 \alias{summary.impacts.bingmm}
 \alias{print.summary.impacts.bingmm}
@@ -38,6 +39,20 @@
   ...
 )
 
+\method{impacts}{binris}(
+  obj,
+  vcov = NULL,
+  het = TRUE,
+  atmeans = FALSE,
+  type = c("mc", "delta"),
+  R = 100,
+  approximation = FALSE,
+  pw = 5,
+  tol = 1e-06,
+  empirical = FALSE,
+  ...
+)
+
 \method{print}{impacts.bingmm}(x, ...)
 
 \method{summary}{impacts.bingmm}(object, ...)
@@ -45,7 +60,7 @@
 \method{print}{summary.impacts.bingmm}(x, digits = max(3, getOption("digits") - 3), ...)
 }
 \arguments{
-\item{obj}{an object of class \code{bingmm}, \code{binlgmm}.}
+\item{obj}{an object of class \code{bingmm}, \code{binlgmm} or \code{binris}.}
 
 \item{vcov}{an estimate of the asymptotic variance-covariance matrix of the parameters for a \code{bingmm} or \code{binlgmm} object.}
 
@@ -79,7 +94,7 @@
 An object of class \code{impacts.bingmm}.
 }
 \description{
-Obtain the average marginal effects from \code{bingmm} or \code{binlgmm} class model.
+Obtain the average marginal effects from \code{bingmm},  \code{binlgmm}  or \code{binris} class model.
 }
 \details{
 Let the model be:
@@ -88,7 +103,8 @@ Let the model be:
 y^*= X\beta + WX\gamma + \lambda W y^* + \epsilon = Z\delta + \lambda Wy^{*} + \epsilon
 }
 
-where  \eqn{y = 1} if \eqn{y^*>0} and 0 otherwise; \eqn{\epsilon \sim N(0, 1)} if \code{link = "probit"} or \eqn{\epsilon \sim L(0, \pi^2/3)} if \code{link = "logit"}.
+where  \eqn{y = 1} if \eqn{y^*>0} and 0 otherwise; \eqn{\epsilon \sim N(0, 1)} if \code{link = "probit"} or \eqn{\epsilon \sim L(0, \pi^2/3)} if \code{link = "logit"}. 
+The RIS estimator assumes that \eqn{\epsilon \sim N(0, 1)}. 
 
 The marginal effects respect to variable \eqn{x_r} can be computed as
 
@@ -128,6 +144,13 @@ summary(impacts(ts, type = "delta", vce = "efficient"))
 
 # Marginal effects using efficient VC matrix and ignoring the heteroskedasticity
 summary(impacts(ts, type = "delta", vce = "efficient", het = FALSE))
+
+# Marginal effects using  RIS estimator
+ris_sar <- sbinaryRis(CRIMED ~ INC + HOVAL, data = COL.OLD,
+                      R = 50, 
+                      listw = spdep::nb2listw(COL.nb, style = "W"))
+summary(impacts(ris_sar, method = "delta"))
+summary(impacts(ris_sar, method = "mc", R = 100))
 }
 }
 \seealso{

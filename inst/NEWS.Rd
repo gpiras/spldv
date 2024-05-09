@@ -2,6 +2,14 @@
 \title{spldv News}
 \encoding{UTF-8}
 
+\section{CHANGES IN VERSION 0.1.4}{
+\subsection{NEW FEATURES}{
+    \itemize{
+      \item Includes RIS estimator with numerical gradient and marginal effects.
+    }
+  }  
+}
+
 \section{CHANGES IN VERSION 0.1.3}{
 \subsection{NEW FEATURES}{
     \itemize{
