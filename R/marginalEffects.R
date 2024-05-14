@@ -5,11 +5,11 @@
 #' @aliases impacts
 #' @import spatialreg
 #' @export impacts
-#' @title Estimation of the average marginal effects for SARB model estimated using GMM procedures.
+#' @title Estimation of the average marginal effects for SARB model estimated using GMM and RIS procedures.
 #' 
-#' @description Obtain the average marginal effects from \code{bingmm} or \code{binlgmm} class model.
+#' @description Obtain the average marginal effects from \code{bingmm},  \code{binlgmm}  or \code{binris} class model.
 #' 
-#' @param obj an object of class \code{bingmm}, \code{binlgmm}.
+#' @param obj an object of class \code{bingmm}, \code{binlgmm} or \code{binris}. 
 #' @param object an object of class \code{impacts.bingmm} for \code{summary} methods.
 #' @param x an object of class \code{impacts.bingmm} for \code{print} methods. 
 #' @param vcov an estimate of the asymptotic variance-covariance matrix of the parameters for a \code{bingmm} or \code{binlgmm} object.
@@ -34,7 +34,8 @@
 #' y^*= X\beta + WX\gamma + \lambda W y^* + \epsilon = Z\delta + \lambda Wy^{*} + \epsilon
 #' }
 #' 
-#' where  \eqn{y = 1} if \eqn{y^*>0} and 0 otherwise; \eqn{\epsilon \sim N(0, 1)} if \code{link = "probit"} or \eqn{\epsilon \sim L(0, \pi^2/3)} if \code{link = "logit"}.
+#' where  \eqn{y = 1} if \eqn{y^*>0} and 0 otherwise; \eqn{\epsilon \sim N(0, 1)} if \code{link = "probit"} or \eqn{\epsilon \sim L(0, \pi^2/3)} if \code{link = "logit"}. 
+#' The RIS estimator assumes that \eqn{\epsilon \sim N(0, 1)}. 
 #' 
 #' The marginal effects respect to variable \eqn{x_r} can be computed as
 #' 
@@ -74,6 +75,13 @@
 #' 
 #' # Marginal effects using efficient VC matrix and ignoring the heteroskedasticity
 #' summary(impacts(ts, type = "delta", vce = "efficient", het = FALSE))
+#' 
+#' # Marginal effects using  RIS estimator
+#' ris_sar <- sbinaryRis(CRIMED ~ INC + HOVAL, data = COL.OLD,
+#'                       R = 50, 
+#'                       listw = spdep::nb2listw(COL.nb, style = "W"))
+#' summary(impacts(ris_sar, method = "delta"))
+#' summary(impacts(ris_sar, method = "mc", R = 100))
 #'}
 #' @return An object of class \code{impacts.bingmm}. 
 #' @seealso \code{\link[spldv]{sbinaryGMM}}, \code{\link[spldv]{sbinaryLGMM}}.
@@ -164,6 +172,65 @@ impacts.binlgmm <- function(obj,
     if (dim(V)[1L] != n.param | dim(V)[2L] != n.param)  stop("dim of vcov are not the same as the estimated parameters")
   }
   mu <- coef(obj)
+  
+  # Make effects
+  if (type == "delta"){
+    me <- dydx.bingmm(coeff = mu, object = obj, het = het, atmeans = atmeans, approximation = approximation, pw = pw)
+    # Make Jacobian (use numerical jacobian)
+    jac <- numDeriv::jacobian(dydx.bingmm, mu, object = obj, het = het, atmeans = atmeans, approximation = approximation, pw = pw)
+    se <- sqrt(diag(jac %*% V %*% t(jac))) 
+  } else {
+    W            <- obj$listw
+    sym          <- all(W == t(W))
+    omega        <- eigen(W, only.values = TRUE, symmetric = sym)
+    interval     <- if (is.complex(omega$values)) 1 / range(Re(omega$values)) else 1 / range(omega$values)
+    samples      <- MASS::mvrnorm(n = R, mu = mu, Sigma = V, tol = tol, empirical = empirical)
+    check        <- ((samples[, length(mu)] > interval[1]) & (samples[, length(mu)] < interval[2]))
+    if (any(!check)) samples <- samples[check, ]
+    sres         <- apply(samples, 1, dydx.bingmm, object = obj, het = het, atmeans = atmeans, approximation = approximation, pw = pw)
+    me           <- apply(sres, 1, mean)
+    se           <- apply(sres, 1, sd)
+  }
+  
+  # Save results
+  z  <-  me / se
+  p  <- 2 * pnorm(-abs(z))
+  results        <- cbind(`dydx` = me, `Std. error` = se, `z value` = z, `Pr(> z)` = p)
+  #object$margins <- results
+  class(results)  <- c("impacts.bingmm")
+  return(results)
+}
+
+#' @rdname impacts.bingmm
+#' @method impacts binris
+#' @importFrom numDeriv jacobian
+#' @importFrom MASS mvrnorm
+#' @export
+impacts.binris <- function(obj,
+                           vcov = NULL,
+                           het = TRUE,
+                           atmeans = FALSE, 
+                           type = c("mc", "delta"), 
+                           R = 100,
+                           approximation = FALSE,
+                           pw  = 5, 
+                           tol = 1e-06, 
+                           empirical = FALSE,
+                           ...){
+  # Type of standard errors
+  if (obj$model == "SEM") stop("SEM model does not require spatial marginal effects \n")
+  type  <- match.arg(type)
+  
+  # Variance covariance matrix
+  if (is.null(vcov)){
+    V <- vcov(obj)
+  } else {
+    V <- vcov
+    n.param <- length(coef(obj))
+    if (dim(V)[1L] != n.param | dim(V)[2L] != n.param)  stop("dim of vcov are not the same as the estimated parameters")
+  }
+  mu <- coef(obj)
+  obj$link <- c("probit") # This is key
   
   # Make effects
   if (type == "delta"){
