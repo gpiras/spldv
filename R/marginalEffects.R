@@ -154,6 +154,10 @@ impacts.bingmm <- function(obj,
   
   if (is.null(data)) data <- obj$data
   
+  # Stop early for formula transformations for which spatial marginal effects
+  # are currently not supported reliably.
+  check_impacts_formula_terms(obj)
+  
   # Prepare derivative arguments
   der_args <- list(
     variable      = variable, 
@@ -393,6 +397,47 @@ impacts.binlgmm <- impacts.bingmm
 #' @export
 impacts.binris <- impacts.bingmm
 
+
+# Check formula terms that are not currently supported by impacts().
+# These transformations can make exact and numerical spatial marginal effects
+# ambiguous or unreliable because the derivative/counterfactual must be
+# propagated through the full spatial multiplier.
+check_impacts_formula_terms <- function(object) {
+  ftxt <- paste(deparse(object$formula), collapse = " ")
+
+  unsupported_patterns <- c(
+    poly  = "(^|[^[:alnum:]_.:])(?:stats::)?poly\\s*\\(",
+    scale = "(^|[^[:alnum:]_.:])(?:base::)?scale\\s*\\(",
+    bs    = "(^|[^[:alnum:]_.:])(?:splines::)?bs\\s*\\(",
+    ns    = "(^|[^[:alnum:]_.:])(?:splines::)?ns\\s*\\("
+  )
+
+  hits <- names(unsupported_patterns)[
+    vapply(unsupported_patterns, grepl, logical(1), x = ftxt, perl = TRUE)
+  ]
+
+  if (length(hits) > 0L) {
+    stop(
+      paste0(
+        "impacts() does not currently support marginal effects for formulas ",
+        "containing the following transformed terms: ",
+        paste0(hits, "()", collapse = ", "), ".\n",
+        "These terms can produce unreliable marginal effects in spatial binary ",
+        "models because the derivative or discrete change must be propagated ",
+        "through the spatial multiplier.\n",
+        "Please rewrite the formula with explicit variables before fitting the ",
+        "model. For quadratic terms, use x + I(x^2) instead of ",
+        "poly(x, 2, raw = TRUE). For scaled variables, create the scaled column ",
+        "in the data first, for example data$x_s <- as.numeric(scale(data$x)), ",
+        "fit the model using x_s, and request impacts(..., variable = 'x_s')."
+      ),
+      call. = FALSE
+    )
+  }
+
+  invisible(TRUE)
+}
+
 #' @rdname impacts.bingmm
 #' @method print impacts.bingmm
 #' @export
@@ -459,6 +504,7 @@ dydx.bingmm <- function(theta,
   # The first argument must be the vector of coefficients to construct also the Jacobian
   
   if (is.null(obj)) stop("object NULL")
+  check_impacts_formula_terms(obj)
   
   # Match argument and check conditions
   result <- match.arg(result)
