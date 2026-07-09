@@ -3,13 +3,26 @@
 \encoding{UTF-8}
 
 \section{CHANGES IN VERSION 0.2.2}{
-\subsection{NEW FEATURES}{
+  \subsection{BUG FIXES AND IMPROVEMENTS}{
     \itemize{
-      \item Fixes bug in S matrix.
-      \item \code{impacts()} now stops with an informative error when the model formula contains transformed terms currently unsupported for spatial marginal effects, such as \code{poly()}, \code{scale()}, \code{bs()}, or \code{ns()}. For quadratic effects, users should write explicit terms such as \code{x + I(x^2)}. For scaled variables, users should create the transformed variable in the data before fitting the model.
-      \item For continuous variables, \code{impacts(..., result = "from.region", dydx = "exact")} and \code{impacts(..., result = "cumulative", dydx = "exact")} now use the analytical derivative path rather than finite differences. Discrete changes, logical variables, and factors continue to use the predictive contrast path.
+      \item Fixed a bug in the computation of the spatial multiplier matrix used by marginal effects.
+      \item For continuous variables, \code{impacts(..., result = "from.region", dydx = "exact")} and \code{impacts(..., result = "cumulative", dydx = "exact")} now use analytical derivatives rather than finite differences. This improves numerical stability and makes the \code{"exact"} option consistent across average, from-region, and cumulative impacts.
+      \item \code{impacts()} now stops with an informative error when the fitted formula contains transformations that are not currently supported for spatial marginal effects, including \code{poly()}, \code{scale()}, \code{bs()}, and \code{ns()}. For quadratic effects, users should write explicit terms such as \code{x + I(x^2)}. For scaled variables, users should create the transformed variable in the data before fitting the model.
+      \item Discrete variables, including factors, ordered factors, and logical variables, continue to be evaluated as predictive contrasts rather than continuous derivatives. This includes formulas that use inline factors such as \code{factor(x)} and interactions involving such factors.
     }
-  }  
+  }
+  \subsection{DOCUMENTATION}{
+    \itemize{
+      \item Expanded the help page for \code{impacts()} and its \code{summary()} method. The documentation now explains average direct, indirect, and total impacts; from-region impacts; cumulative impacts; the role of \code{from.unit}; the interpretation of \code{Q}; the difference between \code{dydx = "exact"} and \code{dydx = "numeric"}; and the distinction between continuous derivatives and discrete contrasts.
+      \item Added examples illustrating average impacts, from-region impacts, cumulative impacts, Monte Carlo and Delta-method standard errors, finite changes through \code{change = c(lower, upper)}, and impacts for models containing inline factor terms.
+    }
+  }
+  \subsection{TESTS AND MAINTENANCE}{
+    \itemize{
+      \item Added regression tests for inline factor terms in average, from-region, and cumulative impacts.
+      \item Ignored local diagnostic and check artifacts so they are not included in package builds.
+    }
+  }
 }
 
 \section{CHANGES IN VERSION 0.2.0}{
@@ -62,4 +75,3 @@
     }
   }  
 }
-
