@@ -7,6 +7,7 @@
     \itemize{
       \item Fixes bug in S matrix.
       \item \code{impacts()} now stops with an informative error when the model formula contains transformed terms currently unsupported for spatial marginal effects, such as \code{poly()}, \code{scale()}, \code{bs()}, or \code{ns()}. For quadratic effects, users should write explicit terms such as \code{x + I(x^2)}. For scaled variables, users should create the transformed variable in the data before fitting the model.
+      \item For continuous variables, \code{impacts(..., result = "from.region", dydx = "exact")} and \code{impacts(..., result = "cumulative", dydx = "exact")} now use the analytical derivative path rather than finite differences. Discrete changes, logical variables, and factors continue to use the predictive contrast path.
     }
   }  
 }

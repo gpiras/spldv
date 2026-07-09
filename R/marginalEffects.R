@@ -523,7 +523,14 @@ dydx.bingmm <- function(theta,
   }
   
   n <- nrow(obj$X)
-  if (max(from.unit) > n) stop("'from.unit' exceeds number of spatial units.")
+  if (result %in% c("from.region", "cumulative")) {
+    if (!is.numeric(from.unit) || length(from.unit) != 1L ||
+        is.na(from.unit) || !is.finite(from.unit) ||
+        from.unit < 1L || from.unit > n || from.unit != floor(from.unit)) {
+      stop("'from.unit' must be a single valid spatial unit index between 1 and n.")
+    }
+    from.unit <- as.integer(from.unit)
+  }
   
   # Data
   if (is.null(data)) data <- obj$data
@@ -542,6 +549,13 @@ dydx.bingmm <- function(theta,
   var_type_map        <- rep(names(tvars), times = sapply(tvars, length))
   names(var_type_map) <- unlist(tvars)
   var_names           <- names(var_type_map)
+  
+  if (result %in% c("from.region", "cumulative")) {
+    if (!is.character(variable) || length(variable) != 1L ||
+        is.na(variable) || !(variable %in% var_names)) {
+      stop("'variable' must be the name of a variable used in the fitted model.")
+    }
+  }
   
   # --- 1) Summary effect (numeric) ----
   if (result == "summary" && dydx == "numeric"){
@@ -622,8 +636,16 @@ dydx.bingmm <- function(theta,
     type.var <- var_type_map[[variable]]
     switch(type.var, 
            nnames = {
-             out <- dydx.num.sp(theta = theta, object = obj, from.unit = from.unit, 
-                                variable = variable, Sinv  = Sinv, het = het, data = data, change = change)
+             if (dydx == "exact" && is.null(change)) {
+               out <- dydx.exact.num.from.sp(theta = theta, object = obj,
+                                             from.unit = from.unit,
+                                             variable = variable, Sinv = Sinv,
+                                             het = het, data = data)
+             } else {
+               out <- dydx.num.sp(theta = theta, object = obj, from.unit = from.unit,
+                                  variable = variable, Sinv = Sinv, het = het,
+                                  data = data, change = change)
+             }
            }, 
            lnames = {
              out <- dydx.logical.sp(theta = theta, object = obj, from.unit = from.unit, 
@@ -685,8 +707,16 @@ dydx.bingmm <- function(theta,
       }
       
       if (type.var == "nnames") {
-        out[, q + 1] <- dydx.num.sp(theta = theta, object = obj, from.unit = from.unit, 
-                                    variable = variable, Sinv = Sinv_q, het = het, data = data, change = change)
+        if (dydx == "exact" && is.null(change)) {
+          out[, q + 1] <- dydx.exact.num.from.sp(theta = theta, object = obj,
+                                                 from.unit = from.unit,
+                                                 variable = variable, Sinv = Sinv_q,
+                                                 het = het, data = data)
+        } else {
+          out[, q + 1] <- dydx.num.sp(theta = theta, object = obj, from.unit = from.unit,
+                                      variable = variable, Sinv = Sinv_q, het = het,
+                                      data = data, change = change)
+        }
       } else if (type.var == "lnames") {
         out[, q + 1] <- dydx.logical.sp(theta = theta, object = obj, from.unit = from.unit, 
                                         variable = variable, Sinv = Sinv_q, het = het, data = data)
@@ -1022,6 +1052,53 @@ dydx.logical.sp <- function(theta = NULL,
   partial.ef <- y.hat.1 - y.hat.0
   
   return(partial.ef)
+}
+
+dydx.exact.num.from.sp <- function(theta = NULL,
+                                    object,
+                                    variable,
+                                    from.unit = 1,
+                                    data = NULL,
+                                    Sinv = NULL,
+                                    het = TRUE,
+                                    approximation = FALSE,
+                                    pw = 5,
+                                    ...){
+  # Exact continuous from-region impact. This returns the column of the
+  # analytical probability-impact matrix associated with `from.unit`.
+  # Discrete changes, logical variables, and factors continue to use the
+  # predictive contrast path.
+  if (missing(data) || is.null(data)) data <- object$data
+  if (is.null(theta)) theta <- coef(object)
+
+  lambda <- theta["lambda"]
+  betas  <- theta[names(theta) != "lambda"]
+  X      <- object$X
+  n      <- nrow(X)
+  W      <- object$listw
+
+  dfun <- switch(object$link, "probit" = dnorm, "logit" = dlogis)
+
+  if (is.null(Sinv)) {
+    A    <- Matrix::Diagonal(n) - lambda * W
+    Sinv <- if (approximation) app_W(W, lambda, pw) else Matrix::solve(A)
+  }
+
+  Di <- NULL
+  if (het) {
+    Di <- Matrix::Diagonal(x = 1 / sqrt(Matrix::rowSums(Sinv^2)))
+  }
+
+  XB <- as.vector(X %*% betas)
+  a  <- if (het) as.vector(Di %*% (Sinv %*% XB)) else as.vector(Sinv %*% XB)
+  fa <- dfun(a)
+  dM <- Matrix::Diagonal(x = fa) %*% (if (het) Di %*% Sinv else Sinv)
+
+  chain.coef <- dydx.chain.num.sp(var = variable, theta = theta,
+                                  model_data = X, data = data, W = W)
+  out <- as.numeric(dM %*% chain.coef[, from.unit, drop = FALSE])
+  names(out) <- rownames(data)
+  return(out)
 }
 
 # Functions for exact derivatives ----
