@@ -292,10 +292,52 @@ impacts.bingmm <- function(obj,
   vce    <- match.arg(vce)
   result <- match.arg(result)
   dydx   <- match.arg(dydx)
+
+  # Patch: validate arguments used by impacts() before expensive computations.
+  # Previously, invalid `change`, non-integer `Q`, or invalid `R` could reach
+  # the helper routines and fail later with less informative errors. We keep the
+  # checks here in the public method so user-facing errors are immediate.
+  if (!is.null(change)) {
+    if (result == "summary") {
+      stop("'change' is only allowed when result is not 'summary'.", call. = FALSE)
+    }
+    if (!is.numeric(change) || length(change) != 2L ||
+        anyNA(change) || !all(is.finite(change))) {
+      stop("'change' must be a finite numeric vector of length 2.", call. = FALSE)
+    }
+  }
+  if (!is.numeric(Q) || length(Q) != 1L ||
+      is.na(Q) || !is.finite(Q) || Q < 0 || Q != floor(Q)) {
+    stop("'Q' must be a single non-negative integer.", call. = FALSE)
+  }
+  Q <- as.integer(Q)
+  if (!is.numeric(R) || length(R) != 1L ||
+      is.na(R) || !is.finite(R) || R < 1 || R != floor(R)) {
+    stop("'R' must be a single positive integer.", call. = FALSE)
+  }
+  R <- as.integer(R)
   
   # Get parameters
   mu       <- coef(obj)
   n_params <- length(mu)
+
+  # Patch: validate user-supplied Monte Carlo draws before they are used below.
+  # Previously, malformed `draws` could fail later during lambda filtering or
+  # impact recomputation with an opaque subsetting error.
+  if (!is.null(draws)) {
+    if (!is.matrix(draws) || !is.numeric(draws)) {
+      stop("'draws' must be a numeric matrix.", call. = FALSE)
+    }
+    if (ncol(draws) != n_params) {
+      stop("'draws' must have one column for each estimated coefficient.", call. = FALSE)
+    }
+    if (!is.null(colnames(draws)) && !identical(colnames(draws), names(mu))) {
+      stop("'draws' column names must match names(coef(obj)) in the same order.", call. = FALSE)
+    }
+    if (anyNA(draws) || !all(is.finite(draws))) {
+      stop("'draws' must contain only finite values.", call. = FALSE)
+    }
+  }
   
   # Obtain VCOV matrix
   V <- if (is.null(vcov)) {
@@ -408,18 +450,34 @@ impacts.bingmm <- function(obj,
     W            <- obj$listw
     sym          <- all(W == t(W))
     omega        <- eigen(W, only.values = TRUE, symmetric = sym)
-    eig_range    <- if (is.complex(omega$values)) range(Re(omega$values)) else 1 / range(omega$values)
-    lambda_range <- 1 / eig_range
-    
+
+    # Patch: compute the admissible lambda interval directly from the
+    # eigenvalue range of W. The previous code inverted the real eigenvalue
+    # range and then inverted it again, which could accept invalid draws or
+    # discard valid draws when the spectral range was not symmetric.
+    eig_vals     <- if (is.complex(omega$values)) Re(omega$values) else omega$values
+    lambda_range <- sort(1 / range(eig_vals))
+
     draws        <- if (is.null(draws)) MASS::mvrnorm(n = R, mu = mu, Sigma = V, tol = tol, empirical = empirical) else draws
-    lambda_pos   <- length(mu)
+    n_draws      <- nrow(draws)
+    lambda_pos   <- match("lambda", names(mu))
+    if (is.na(lambda_pos)) {
+      stop("Cannot filter Monte Carlo draws: coefficient 'lambda' was not found.", call. = FALSE)
+    }
     valid        <- draws[, lambda_pos] > lambda_range[1] & draws[, lambda_pos] < lambda_range[2]
     valid_draws  <- draws[valid, , drop = FALSE]
-    
-    if (nrow(valid_draws) < R) {
-      warning("Some draws discarded due to invalid lambda. R reduced to ", nrow(valid_draws), ".")
+
+    # Patch: stop explicitly when every draw is outside the admissible spatial
+    # parameter range. Previously the code continued and could fail later when
+    # accessing an empty list of impact draws.
+    if (nrow(valid_draws) == 0L) {
+      stop("No valid Monte Carlo draws remain after filtering lambda.", call. = FALSE)
     }
-    
+    if (nrow(valid_draws) < n_draws) {
+      warning("Some draws discarded due to invalid lambda. Number of draws reduced to ",
+              nrow(valid_draws), ".")
+    }
+
     sres_list <- lapply(seq_len(nrow(valid_draws)), function(i) compute_dydx(valid_draws[i, ]))
     
     # === Post-processing Monte Carlo Results ===
@@ -673,13 +731,26 @@ dydx.bingmm <- function(theta,
   if (result %in% c("from.region", "cumulative") && is.null(variable)) {
     stop(sprintf("'%s' estimates require a specified variable.", result))
   }
+
+  # Patch: repeat the lightweight `change` and `Q` checks inside dydx.bingmm().
+  # This worker is internal, but tests and other internal code may call it
+  # directly, bypassing the public impacts() method. Keeping the checks here
+  # prevents silent fallbacks such as treating a malformed `change` as a
+  # numerical derivative request.
   if (!is.null(change)) {
     if (result == "summary") {
-      stop("'change' parameter is only allowed when dydx = 'numeric' and result != 'summary'")
+      stop("'change' is only allowed when result is not 'summary'.", call. = FALSE)
     }
-    # Additional validation for change values could go here
-    # }
+    if (!is.numeric(change) || length(change) != 2L ||
+        anyNA(change) || !all(is.finite(change))) {
+      stop("'change' must be a finite numeric vector of length 2.", call. = FALSE)
+    }
   }
+  if (!is.numeric(Q) || length(Q) != 1L ||
+      is.na(Q) || !is.finite(Q) || Q < 0 || Q != floor(Q)) {
+    stop("'Q' must be a single non-negative integer.", call. = FALSE)
+  }
+  Q <- as.integer(Q)
   
   n <- nrow(obj$X)
   if (result %in% c("from.region", "cumulative")) {
