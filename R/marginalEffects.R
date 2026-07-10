@@ -1,107 +1,266 @@
 # Marginal Effects (Impacts) ----
 
-#' @title Compute Marginal Effects for Spatial Binary  Models
-#' 
+#' @title Probability Impacts for Spatial Binary Response Models
+#'
 #' @aliases impacts
 #' @import spatialreg
 #' @export impacts
-#' 
+#'
 #' @description
-#' Computes marginal effects (direct, indirect, total, from-region, and cumulative) from a spatial binary response model.
-#' Supports inference via the Delta method or Monte Carlo simulation.
-#' 
-#' @param obj An object of class \code{bingmm}, \code{binlgmm} or \code{binris}. 
-#' @param object An object of class \code{impacts.bingmm} for \code{summary} methods.
-#' @param x An object of class \code{impacts.bingmm} for \code{print} methods. 
-#' @param data Optional dataset used for computing partial effects.
-#' @param variable Variable name (string) for which marginal effects are computed.
-#' @param from.unit Integer specifying the spatial unit (row) for computing impacts.
-#' @param dydx Character: type of derivative approximation to use (\code{"exact"} or \code{"numeric"}).
-#' @param change For numeric variables, a vector indicating the lower and upper value to compute the partial change. 
-#' @param vce A string indicating what kind of variance-covariance matrix of the estimate should be computed when using \code{effect.bingmm}. For the one-step GMM estimator, the options are \code{"robust"} and \code{"ml"}. For the two-step GMM estimator, the options are \code{"robust"}, \code{"efficient"} and \code{"ml"}. The option \code{"vce = ml"} is an exploratory method that evaluates the VC of the RIS estimator using the GMM estimates.
-#' @param type String indicating which method is used to compute the standard errors of the marginal effects. If \code{"mc"}, then the Monte Carlo approximation is used. If \code{"delta"}, then the Delta Method is used.
-#' @param result String indicating the output format: \code{"summary"} presents the average direct, indirect or total effects; \code{"from.region"} display the total effect of the variable in \code{"variable"} form spatial unit indicated in \code{"from.unit"}; if \code{"cumulative"} the cumulative effect up to power order indicated in \code{"Q"} for the variable in \code{"variable"} form spatial unit indicated in \code{"from.unit"} is returned.
-#' @param vcov Optional user-supplied variance-covariance matrix.
-#' @param het Logical. If \code{TRUE} (the default), then the heteroskedasticity is taken into account when computing the marginal effects. 
-#' @param empirical Logical. Argument passed to \code{mvrnorm} (default \code{FALSE}): if \code{TRUE}, the coefficients and their covariance matrix specify the empirical not population mean and covariance matrix.
-#' @param R Numerical. Indicates the number of draws used in the Monte Carlo approximation if \code{type = "mc"}.
-#' @param approximation Logical. If \code{TRUE} then \eqn{(I - \lambda W)^{-1}} is approximated as \eqn{I + \lambda W + \lambda^2 W^2 + \lambda^3 W^3 + ... +\lambda^q W^q}. The default is \code{FALSE}.
-#' @param pw numeric. The power used for the approximation \eqn{I + \lambda W + \lambda^2 W^2 + \lambda^3 W^3 + ... +\lambda^q W^q}. The default is 5.
-#' @param draws Optional matrix of parameter draws for Monte Carlo simulation.
-#' @param Q Number of columns for cumulative effects (if applicable).
-#' @param tol Numerical. Argument passed to \code{mvrnorm}: tolerance (relative to largest variance) for numerical lack of positive-definiteness in the coefficient covariance matrix.
-#' @param verbose Logical. Display progress.
-#' @param digits the number of digits.
-#' @param ... further arguments. Ignored.
-#' 
-#' @details 
-#' 
-#' Let the model be:
-#' 
+#' Computes probability impacts for fitted spatial binary response models. The
+#' function translates estimated coefficients into changes in fitted outcome
+#' probabilities, taking account of the nonlinear binary-response link and, when
+#' present, the spatial multiplier. It can return scalar average impacts,
+#' origin-specific impacts from one spatial unit to all destination units, or
+#' cumulative impacts by spatial feedback order. Standard errors can be obtained
+#' by the Delta method or by Monte Carlo simulation from the estimated
+#' coefficient distribution.
+#'
+#' @param obj An object of class \code{bingmm}, \code{binlgmm}, or
+#'   \code{binris}.
+#' @param object An object of class \code{impacts.bingmm} for \code{summary}
+#'   methods.
+#' @param x An object of class \code{impacts.bingmm} for \code{print}
+#'   methods.
+#' @param data Optional data frame used to compute fitted probabilities and
+#'   probability impacts. If omitted, the estimation data stored in \code{obj} is
+#'   used.
+#' @param variable Character string giving the original variable for which
+#'   impacts are requested. This is required for \code{result = "from.region"}
+#'   and \code{result = "cumulative"}. If the model formula contains
+#'   \code{factor(CP)}, use \code{variable = "CP"}, not
+#'   \code{variable = "factor(CP)"}. For \code{result = "summary"}, impacts
+#'   are computed for all variables in the fitted model and \code{variable} is
+#'   ignored.
+#' @param from.unit Integer identifying the source spatial unit where the
+#'   covariate change is applied. This argument is used only when
+#'   \code{result = "from.region"} or \code{result = "cumulative"}. The
+#'   returned vector gives the effect of that source-unit change on the fitted
+#'   probabilities of all destination units.
+#' @param dydx Character string indicating how continuous-variable impacts are
+#'   computed. \code{"exact"} uses analytical derivatives when available.
+#'   \code{"numeric"} uses predictive finite differences. Factor, ordered, and
+#'   logical variables are always evaluated as discrete probability contrasts,
+#'   because derivatives with respect to categories are not meaningful.
+#' @param change Optional numeric vector of length two, \code{c(lower, upper)},
+#'   used with continuous variables when a discrete probability change is desired
+#'   instead of a derivative. For example, \code{change = c(10, 20)} computes the
+#'   change in fitted probabilities when the source-unit value of \code{variable}
+#'   is set from 10 to 20. This argument is allowed only when
+#'   \code{result != "summary"}.
+#' @param vce Character string indicating which variance-covariance matrix of
+#'   the estimated coefficients should be used when \code{vcov} is not supplied.
+#'   For one-step GMM, the options are \code{"robust"} and \code{"ml"}. For
+#'   two-step GMM, the options are \code{"robust"}, \code{"efficient"}, and
+#'   \code{"ml"}. The option \code{"ml"} is exploratory and evaluates the
+#'   variance-covariance matrix of the RIS estimator at the GMM estimates.
+#' @param type Character string indicating how standard errors are computed.
+#'   \code{"delta"} uses the Delta method. \code{"mc"} simulates coefficient
+#'   draws from the estimated asymptotic distribution and recomputes the impacts
+#'   for each draw.
+#' @param result Character string selecting the output object. \code{"summary"}
+#'   returns scalar average total, direct, and indirect effects. \code{"from.region"}
+#'   returns the vector of destination-unit effects generated by a change in the
+#'   source unit \code{from.unit}. \code{"cumulative"} returns these
+#'   source-to-destination effects after successively adding spatial feedback
+#'   orders from zero up to \code{Q}.
+#' @param vcov Optional user-supplied variance-covariance matrix for the
+#'   estimated coefficients. If supplied, it overrides \code{vce}.
+#' @param het Logical. If \code{TRUE} (the default), the heteroskedasticity
+#'   induced by the spatial multiplier is taken into account when converting the
+#'   latent index to fitted probabilities.
+#' @param empirical Logical argument passed to \code{MASS::mvrnorm()} when
+#'   \code{type = "mc"}. If \code{TRUE}, the simulated draws have empirical mean
+#'   and covariance equal to the supplied values.
+#' @param R Integer giving the number of coefficient draws used when
+#'   \code{type = "mc"}.
+#' @param approximation Logical. If \code{TRUE}, the spatial multiplier
+#'   \eqn{(I - \lambda W)^{-1}} is approximated by the finite expansion
+#'   \eqn{I + \lambda W + \lambda^2 W^2 + \cdots + \lambda^q W^q} using
+#'   \code{pw} as the maximum power. This option applies to the inverse used in
+#'   \code{result = "summary"} and \code{result = "from.region"}; cumulative
+#'   output is controlled separately by \code{Q}.
+#' @param pw Integer giving the maximum power used when
+#'   \code{approximation = TRUE}. The default is 5.
+#' @param draws Optional matrix of user-supplied coefficient draws for Monte
+#'   Carlo inference. Columns must match the estimated coefficient vector.
+#' @param Q Integer giving the highest spatial-feedback order reported when
+#'   \code{result = "cumulative"}. The output contains \code{Q + 1} columns,
+#'   labelled \code{Q:0}, \code{Q:1}, ..., \code{Q:Q}.
+#' @param tol Numerical tolerance passed to \code{MASS::mvrnorm()} when checking
+#'   positive definiteness of the coefficient covariance matrix.
+#' @param verbose Logical. If \code{TRUE}, progress messages are printed for
+#'   computations that loop over spatial units.
+#' @param digits Number of digits used by the print method.
+#' @param ... Further arguments. Currently ignored.
+#'
+#' @details
+#' \subsection{Model and probability impacts}{
+#' The fitted model is written in latent-index form as
 #' \deqn{
-#' y^*= X\beta + WX\gamma + \lambda W y^* + \epsilon = Z\delta + \lambda Wy^{*} + \epsilon
+#' y^* = X\beta + WX\gamma + \lambda W y^* + \epsilon
+#'      = Z\delta + \lambda W y^* + \epsilon,
 #' }
-#' 
-#' where  \eqn{y = 1} if \eqn{y^*>0} and 0 otherwise; \eqn{\epsilon \sim N(0, 1)} if \code{link = "probit"} or \eqn{\epsilon \sim L(0, \pi^2/3)} if \code{link = "logit"}. 
-#' The RIS estimator assumes that \eqn{\epsilon \sim N(0, 1)}. 
-#' 
-#' The marginal effects respect to variable \eqn{x_r} can be computed as
-#' 
+#' where \eqn{y = 1[y^* > 0]}. For \code{link = "probit"},
+#' \eqn{\epsilon} is standard normal. For \code{link = "logit"},
+#' \eqn{\epsilon} follows the standard logistic distribution. The RIS
+#' estimator is probit-based.
+#'
+#' In spatial binary response models, coefficients are not probability effects.
+#' A change in a covariate affects the latent index, propagates through the
+#' spatial multiplier, and is then transformed by the probit or logit link into
+#' fitted probabilities. For a continuous variable \eqn{x_r}, the analytical
+#' probability-impact matrix has the form
 #' \deqn{
-#' diag(f(a))D^{-1}_{\lambda}A^{-1}_{\lambda}\left(I_n\beta_r + W\gamma_r\right) = C_r(\theta)
+#' C_r(\theta) = \mathrm{diag}(f(a))D_{\lambda}^{-1}
+#' A_{\lambda}^{-1}(I_n\beta_r + W\gamma_r),
 #' }
-#' 
-#' where \eqn{f()} is the pdf, which depends on the assumption of the error terms; \eqn{diag} is the operator that creates a \eqn{n \times n} diagonal matrix; \eqn{A_{\lambda}= (I -\lambda W)}; and \eqn{D_{\lambda}} is a diagonal matrix whose elements represent the square root of the diagonal elements of the variance-covariance matrix of \eqn{u = A_{\lambda}^{-1}\epsilon}. 
-#' 
-#' We implement these three summary measures: (1) The average total effects, \eqn{ATE_r  = n^{-1}i_n'C_{r}i_n}, (2) The average direct effects, \eqn{ADE_r  = n^{-1}tr(C_{r})}, and (3) the average indirect effects, \eqn{ATE_r - ADE_r}. 
-#' 
-#' The standard errors of the average total, direct and indirect effects can be estimated using either Monte Carlo (MC) approximation, which takes into account the sampling distribution of \eqn{\theta}, or Delta Method. 
-#' 
+#' where \eqn{f()} is the link density, \eqn{A_{\lambda} = I - \lambda W},
+#' and \eqn{D_{\lambda}} is a diagonal scaling matrix based on the diagonal
+#' elements of the variance-covariance matrix of
+#' \eqn{A_{\lambda}^{-1}\epsilon}. Rows of \eqn{C_r(\theta)} correspond to
+#' destination units and columns correspond to source units.
+#' }
+#'
+#' \subsection{Average, from-region, and cumulative output}{
+#' With \code{result = "summary"}, \code{impacts()} returns scalar summaries
+#' for each variable: the average total effect
+#' \eqn{n^{-1}\iota_n' C_r \iota_n}, the average direct effect
+#' \eqn{n^{-1}\mathrm{tr}(C_r)}, and the average indirect effect, defined as
+#' total minus direct. The S3 method \code{summary()} is designed only for this
+#' scalar-summary output; it formats the coefficient table into total, direct,
+#' and indirect blocks.
+#'
+#' With \code{result = "from.region"}, \code{from.unit} is interpreted as the
+#' source region. The returned object gives the probability effect of changing
+#' \code{variable} in that source region on every destination region. For a
+#' continuous variable with \code{dydx = "exact"} and no \code{change}, this is
+#' the corresponding column of the analytical impact matrix. For finite
+#' differences and discrete variables, it is computed as a difference in fitted
+#' probabilities.
+#'
+#' With \code{result = "cumulative"}, the function reports how the same
+#' source-region impact accumulates as additional feedback orders are included.
+#' The column \code{Q:0} uses only the zero-order term \eqn{I}. The column
+#' \code{Q:1} uses \eqn{I + \lambda W}. In general, \code{Q:q} uses
+#' \eqn{I + \lambda W + \cdots + \lambda^q W^q}. This output is useful for
+#' seeing how much of a spatial probability impact is local and how much is
+#' generated by higher-order spatial feedback.
+#' }
+#'
+#' \subsection{Continuous derivatives and discrete contrasts}{
+#' For continuous variables, \code{dydx = "exact"} uses analytical derivatives
+#' where implemented. This is usually preferred because it avoids numerical
+#' step-size sensitivity. \code{dydx = "numeric"} computes predictive finite
+#' differences by perturbing the source-unit value of the variable and comparing
+#' fitted probabilities. Supplying \code{change = c(lower, upper)} requests a
+#' finite probability change from \code{lower} to \code{upper}, not a derivative
+#' divided by \code{upper - lower}.
+#'
+#' Factor, ordered, and logical variables are handled as discrete probability
+#' contrasts. For factors, contrasts are reported relative to the reference
+#' level, with one component for each non-reference level. For logical
+#' variables, the contrast is from \code{FALSE} to \code{TRUE}. These contrasts
+#' are the appropriate probability-scale analogues of marginal effects for
+#' non-continuous regressors.
+#' }
+#'
+#' \subsection{Inference}{
+#' When \code{type = "delta"}, standard errors are computed by applying the
+#' Delta method to the selected impact measure. Internally, the Jacobian of the
+#' impact vector with respect to the estimated coefficients is combined with the
+#' coefficient variance-covariance matrix. When \code{type = "mc"}, coefficient
+#' draws are generated from the estimated asymptotic normal distribution, impacts
+#' are recomputed for each draw, and the simulation standard deviation is used
+#' as the standard error. User-supplied draws can be passed through
+#' \code{draws}. Draws that imply inadmissible spatial parameters are discarded.
+#' }
+#'
+#' \subsection{Formula restrictions}{
+#' The current implementation does not support formulas containing
+#' \code{poly()}, \code{scale()}, \code{splines::bs()}, or
+#' \code{splines::ns()} inside \code{impacts()}. These transformations can make
+#' probability impacts ambiguous because the derivative or discrete change must
+#' be propagated through the transformed design matrix and the spatial
+#' multiplier. Create transformed variables explicitly before fitting the model.
+#' For example, use \code{x2 <- x^2} and include \code{x + x2}, or create
+#' \code{x_s <- as.numeric(scale(x))} before estimation and request impacts for
+#' \code{"x_s"}.
+#' }
+#'
 #' @examples
 #' \donttest{
 #' # Data set
 #' data(oldcol, package = "spdep")
-#' 
+#'
 #' # Create dependent (dummy) variable
 #' COL.OLD$CRIMED <- as.numeric(COL.OLD$CRIME > 35)
-#' 
-#' # Two-step (Probit) GMM estimator
+#'
+#' # Two-step probit GMM estimator. CP is used as a factor directly in the
+#' # formula; impacts should later be requested with variable = "CP".
 #' ts <- sbinaryGMM(CRIMED ~ INC * HOVAL + factor(CP) | HOVAL,
-#'                 link = "probit", 
-#'                 listw = spdep::nb2listw(COL.nb, style = "W"), 
-#'                 data = COL.OLD, 
+#'                 link = "probit",
+#'                 listw = spdep::nb2listw(COL.nb, style = "W"),
+#'                 data = COL.OLD,
 #'                 type = "twostep")
-#'                 
-#' # Summary marginal effects using Delta Method
+#'
+#' # Scalar average probability impacts: total, direct, and indirect effects.
 #' summary(impacts(ts, type = "delta"))
-#' 
-#' # Summary marginal effects using MC with 100 draws
+#'
+#' # The same scalar summaries using simulation-based standard errors.
 #' summary(impacts(ts, type = "mc", R = 100))
-#' 
-#' # Marginal effects using efficient VC matrix
+#'
+#' # Use the efficient two-step GMM variance-covariance matrix.
 #' summary(impacts(ts, type = "delta", vce = "efficient"))
-#' 
-#' # Marginal effects using efficient VC matrix and ignoring the heteroskedasticity
+#'
+#' # Ignore the heteroskedasticity adjustment induced by the spatial multiplier.
 #' summary(impacts(ts, type = "delta", vce = "efficient", het = FALSE))
-#' 
-#' # Obtain total impact when INC changes in region 20
-#' imp <- impacts(ts, type = "delta", result = "from.region", from.unit = 20, variable = "INC")
-#' head(imp$out, 6)
-#' 
-#' # Cumulative impact when INC changes in region 20 up to power = 3
-#' cum <- impacts(ts, type = "delta", result = "cumulative", from.unit = 20, variable = "INC", Q = 3)
-#' head(cum$out$`Q:3`, 6)
-#' 
-#' # Marginal effects using  RIS estimator
+#'
+#' # Source-region impact: change INC in region 20 and report effects on all
+#' # destination regions. With dydx = "exact" this is an analytical derivative.
+#' imp_inc <- impacts(ts, type = "delta", result = "from.region",
+#'                    from.unit = 20, variable = "INC")
+#' head(imp_inc$out, 6)
+#'
+#' # Discrete probability change for a continuous variable: set INC in region 20
+#' # from 10 to 20 and compare fitted probabilities.
+#' imp_inc_10_20 <- impacts(ts, type = "delta", result = "from.region",
+#'                          from.unit = 20, variable = "INC",
+#'                          dydx = "numeric", change = c(10, 20))
+#' head(imp_inc_10_20$out, 6)
+#'
+#' # Factor impacts are discrete contrasts relative to the reference level. Use
+#' # the original variable name, not "factor(CP)".
+#' imp_cp <- impacts(ts, type = "delta", result = "from.region",
+#'                   from.unit = 20, variable = "CP")
+#' names(imp_cp$out)
+#' head(imp_cp$out[[1]], 6)
+#'
+#' # Cumulative source-region impacts up to third-order spatial feedback.
+#' cum_inc <- impacts(ts, type = "delta", result = "cumulative",
+#'                    from.unit = 20, variable = "INC", Q = 3)
+#' names(cum_inc$out)
+#' head(cum_inc$out$`Q:0`, 6)
+#' head(cum_inc$out$`Q:3`, 6)
+#'
+#' # Marginal effects using the RIS estimator.
 #' ris_sar <- sbinaryRis(CRIMED ~ INC + HOVAL, data = COL.OLD,
-#'                       R = 50, 
+#'                       R = 50,
 #'                       listw = spdep::nb2listw(COL.nb, style = "W"))
-#' summary(impacts(ris_sar, method = "delta"))
-#' summary(impacts(ris_sar, method = "mc", R = 100))
-#'}
-#' @return An object of class \code{impacts.bingmm}. 
-#' @seealso \code{\link[spldv]{sbinaryGMM}}, \code{\link[spldv]{sbinaryLGMM}}.
-#' @author Mauricio Sarrias and Gianfranco Piras. 
+#' summary(impacts(ris_sar, type = "delta"))
+#' summary(impacts(ris_sar, type = "mc", R = 100))
+#' }
+#' @return An object of class \code{impacts.bingmm}. The object contains at
+#'   least two elements: \code{out}, with the requested estimates and standard
+#'   errors, and \code{result}, recording the selected output mode. For
+#'   \code{result = "summary"}, \code{out} is a table that can be formatted by
+#'   \code{summary()}. For \code{result = "from.region"}, \code{out} is a data
+#'   frame for continuous or logical variables and a list of data frames for
+#'   factor variables. For \code{result = "cumulative"}, \code{out} is a list of
+#'   cumulative tables, or a nested list when the requested variable is a factor.
+#' @seealso \code{\link[spldv]{sbinaryGMM}},
+#'   \code{\link[spldv]{sbinaryLGMM}}.
+#' @author Mauricio Sarrias and Gianfranco Piras.
 #' @method impacts bingmm
 #' @importFrom numDeriv jacobian
 #' @importFrom MASS mvrnorm
@@ -133,10 +292,52 @@ impacts.bingmm <- function(obj,
   vce    <- match.arg(vce)
   result <- match.arg(result)
   dydx   <- match.arg(dydx)
+
+  # Patch: validate arguments used by impacts() before expensive computations.
+  # Previously, invalid `change`, non-integer `Q`, or invalid `R` could reach
+  # the helper routines and fail later with less informative errors. We keep the
+  # checks here in the public method so user-facing errors are immediate.
+  if (!is.null(change)) {
+    if (result == "summary") {
+      stop("'change' is only allowed when result is not 'summary'.", call. = FALSE)
+    }
+    if (!is.numeric(change) || length(change) != 2L ||
+        anyNA(change) || !all(is.finite(change))) {
+      stop("'change' must be a finite numeric vector of length 2.", call. = FALSE)
+    }
+  }
+  if (!is.numeric(Q) || length(Q) != 1L ||
+      is.na(Q) || !is.finite(Q) || Q < 0 || Q != floor(Q)) {
+    stop("'Q' must be a single non-negative integer.", call. = FALSE)
+  }
+  Q <- as.integer(Q)
+  if (!is.numeric(R) || length(R) != 1L ||
+      is.na(R) || !is.finite(R) || R < 1 || R != floor(R)) {
+    stop("'R' must be a single positive integer.", call. = FALSE)
+  }
+  R <- as.integer(R)
   
   # Get parameters
   mu       <- coef(obj)
   n_params <- length(mu)
+
+  # Patch: validate user-supplied Monte Carlo draws before they are used below.
+  # Previously, malformed `draws` could fail later during lambda filtering or
+  # impact recomputation with an opaque subsetting error.
+  if (!is.null(draws)) {
+    if (!is.matrix(draws) || !is.numeric(draws)) {
+      stop("'draws' must be a numeric matrix.", call. = FALSE)
+    }
+    if (ncol(draws) != n_params) {
+      stop("'draws' must have one column for each estimated coefficient.", call. = FALSE)
+    }
+    if (!is.null(colnames(draws)) && !identical(colnames(draws), names(mu))) {
+      stop("'draws' column names must match names(coef(obj)) in the same order.", call. = FALSE)
+    }
+    if (anyNA(draws) || !all(is.finite(draws))) {
+      stop("'draws' must contain only finite values.", call. = FALSE)
+    }
+  }
   
   # Obtain VCOV matrix
   V <- if (is.null(vcov)) {
@@ -153,6 +354,10 @@ impacts.bingmm <- function(obj,
   }
   
   if (is.null(data)) data <- obj$data
+  
+  # Stop early for formula transformations for which spatial marginal effects
+  # are currently not supported reliably.
+  check_impacts_formula_terms(obj)
   
   # Prepare derivative arguments
   der_args <- list(
@@ -245,18 +450,34 @@ impacts.bingmm <- function(obj,
     W            <- obj$listw
     sym          <- all(W == t(W))
     omega        <- eigen(W, only.values = TRUE, symmetric = sym)
-    eig_range    <- if (is.complex(omega$values)) range(Re(omega$values)) else 1 / range(omega$values)
-    lambda_range <- 1 / eig_range
-    
+
+    # Patch: compute the admissible lambda interval directly from the
+    # eigenvalue range of W. The previous code inverted the real eigenvalue
+    # range and then inverted it again, which could accept invalid draws or
+    # discard valid draws when the spectral range was not symmetric.
+    eig_vals     <- if (is.complex(omega$values)) Re(omega$values) else omega$values
+    lambda_range <- sort(1 / range(eig_vals))
+
     draws        <- if (is.null(draws)) MASS::mvrnorm(n = R, mu = mu, Sigma = V, tol = tol, empirical = empirical) else draws
-    lambda_pos   <- length(mu)
+    n_draws      <- nrow(draws)
+    lambda_pos   <- match("lambda", names(mu))
+    if (is.na(lambda_pos)) {
+      stop("Cannot filter Monte Carlo draws: coefficient 'lambda' was not found.", call. = FALSE)
+    }
     valid        <- draws[, lambda_pos] > lambda_range[1] & draws[, lambda_pos] < lambda_range[2]
     valid_draws  <- draws[valid, , drop = FALSE]
-    
-    if (nrow(valid_draws) < R) {
-      warning("Some draws discarded due to invalid lambda. R reduced to ", nrow(valid_draws), ".")
+
+    # Patch: stop explicitly when every draw is outside the admissible spatial
+    # parameter range. Previously the code continued and could fail later when
+    # accessing an empty list of impact draws.
+    if (nrow(valid_draws) == 0L) {
+      stop("No valid Monte Carlo draws remain after filtering lambda.", call. = FALSE)
     }
-    
+    if (nrow(valid_draws) < n_draws) {
+      warning("Some draws discarded due to invalid lambda. Number of draws reduced to ",
+              nrow(valid_draws), ".")
+    }
+
     sres_list <- lapply(seq_len(nrow(valid_draws)), function(i) compute_dydx(valid_draws[i, ]))
     
     # === Post-processing Monte Carlo Results ===
@@ -393,6 +614,47 @@ impacts.binlgmm <- impacts.bingmm
 #' @export
 impacts.binris <- impacts.bingmm
 
+
+# Check formula terms that are not currently supported by impacts().
+# These transformations can make exact and numerical spatial marginal effects
+# ambiguous or unreliable because the derivative/counterfactual must be
+# propagated through the full spatial multiplier.
+check_impacts_formula_terms <- function(object) {
+  ftxt <- paste(deparse(object$formula), collapse = " ")
+
+  unsupported_patterns <- c(
+    poly  = "(^|[^[:alnum:]_.:])(?:stats::)?poly\\s*\\(",
+    scale = "(^|[^[:alnum:]_.:])(?:base::)?scale\\s*\\(",
+    bs    = "(^|[^[:alnum:]_.:])(?:splines::)?bs\\s*\\(",
+    ns    = "(^|[^[:alnum:]_.:])(?:splines::)?ns\\s*\\("
+  )
+
+  hits <- names(unsupported_patterns)[
+    vapply(unsupported_patterns, grepl, logical(1), x = ftxt, perl = TRUE)
+  ]
+
+  if (length(hits) > 0L) {
+    stop(
+      paste0(
+        "impacts() does not currently support marginal effects for formulas ",
+        "containing the following transformed terms: ",
+        paste0(hits, "()", collapse = ", "), ".\n",
+        "These terms can produce unreliable marginal effects in spatial binary ",
+        "models because the derivative or discrete change must be propagated ",
+        "through the spatial multiplier.\n",
+        "Please rewrite the formula with explicit variables before fitting the ",
+        "model. For quadratic terms, use x + I(x^2) instead of ",
+        "poly(x, 2, raw = TRUE). For scaled variables, create the scaled column ",
+        "in the data first, for example data$x_s <- as.numeric(scale(data$x)), ",
+        "fit the model using x_s, and request impacts(..., variable = 'x_s')."
+      ),
+      call. = FALSE
+    )
+  }
+
+  invisible(TRUE)
+}
+
 #' @rdname impacts.bingmm
 #' @method print impacts.bingmm
 #' @export
@@ -459,6 +721,7 @@ dydx.bingmm <- function(theta,
   # The first argument must be the vector of coefficients to construct also the Jacobian
   
   if (is.null(obj)) stop("object NULL")
+  check_impacts_formula_terms(obj)
   
   # Match argument and check conditions
   result <- match.arg(result)
@@ -468,16 +731,36 @@ dydx.bingmm <- function(theta,
   if (result %in% c("from.region", "cumulative") && is.null(variable)) {
     stop(sprintf("'%s' estimates require a specified variable.", result))
   }
+
+  # Patch: repeat the lightweight `change` and `Q` checks inside dydx.bingmm().
+  # This worker is internal, but tests and other internal code may call it
+  # directly, bypassing the public impacts() method. Keeping the checks here
+  # prevents silent fallbacks such as treating a malformed `change` as a
+  # numerical derivative request.
   if (!is.null(change)) {
     if (result == "summary") {
-      stop("'change' parameter is only allowed when dydx = 'numeric' and result != 'summary'")
+      stop("'change' is only allowed when result is not 'summary'.", call. = FALSE)
     }
-    # Additional validation for change values could go here
-    # }
+    if (!is.numeric(change) || length(change) != 2L ||
+        anyNA(change) || !all(is.finite(change))) {
+      stop("'change' must be a finite numeric vector of length 2.", call. = FALSE)
+    }
   }
+  if (!is.numeric(Q) || length(Q) != 1L ||
+      is.na(Q) || !is.finite(Q) || Q < 0 || Q != floor(Q)) {
+    stop("'Q' must be a single non-negative integer.", call. = FALSE)
+  }
+  Q <- as.integer(Q)
   
   n <- nrow(obj$X)
-  if (max(from.unit) > n) stop("'from.unit' exceeds number of spatial units.")
+  if (result %in% c("from.region", "cumulative")) {
+    if (!is.numeric(from.unit) || length(from.unit) != 1L ||
+        is.na(from.unit) || !is.finite(from.unit) ||
+        from.unit < 1L || from.unit > n || from.unit != floor(from.unit)) {
+      stop("'from.unit' must be a single valid spatial unit index between 1 and n.")
+    }
+    from.unit <- as.integer(from.unit)
+  }
   
   # Data
   if (is.null(data)) data <- obj$data
@@ -496,6 +779,13 @@ dydx.bingmm <- function(theta,
   var_type_map        <- rep(names(tvars), times = sapply(tvars, length))
   names(var_type_map) <- unlist(tvars)
   var_names           <- names(var_type_map)
+  
+  if (result %in% c("from.region", "cumulative")) {
+    if (!is.character(variable) || length(variable) != 1L ||
+        is.na(variable) || !(variable %in% var_names)) {
+      stop("'variable' must be the name of a variable used in the fitted model.")
+    }
+  }
   
   # --- 1) Summary effect (numeric) ----
   if (result == "summary" && dydx == "numeric"){
@@ -576,8 +866,16 @@ dydx.bingmm <- function(theta,
     type.var <- var_type_map[[variable]]
     switch(type.var, 
            nnames = {
-             out <- dydx.num.sp(theta = theta, object = obj, from.unit = from.unit, 
-                                variable = variable, Sinv  = Sinv, het = het, data = data, change = change)
+             if (dydx == "exact" && is.null(change)) {
+               out <- dydx.exact.num.from.sp(theta = theta, object = obj,
+                                             from.unit = from.unit,
+                                             variable = variable, Sinv = Sinv,
+                                             het = het, data = data)
+             } else {
+               out <- dydx.num.sp(theta = theta, object = obj, from.unit = from.unit,
+                                  variable = variable, Sinv = Sinv, het = het,
+                                  data = data, change = change)
+             }
            }, 
            lnames = {
              out <- dydx.logical.sp(theta = theta, object = obj, from.unit = from.unit, 
@@ -639,8 +937,16 @@ dydx.bingmm <- function(theta,
       }
       
       if (type.var == "nnames") {
-        out[, q + 1] <- dydx.num.sp(theta = theta, object = obj, from.unit = from.unit, 
-                                    variable = variable, Sinv = Sinv_q, het = het, data = data, change = change)
+        if (dydx == "exact" && is.null(change)) {
+          out[, q + 1] <- dydx.exact.num.from.sp(theta = theta, object = obj,
+                                                 from.unit = from.unit,
+                                                 variable = variable, Sinv = Sinv_q,
+                                                 het = het, data = data)
+        } else {
+          out[, q + 1] <- dydx.num.sp(theta = theta, object = obj, from.unit = from.unit,
+                                      variable = variable, Sinv = Sinv_q, het = het,
+                                      data = data, change = change)
+        }
       } else if (type.var == "lnames") {
         out[, q + 1] <- dydx.logical.sp(theta = theta, object = obj, from.unit = from.unit, 
                                         variable = variable, Sinv = Sinv_q, het = het, data = data)
@@ -976,6 +1282,53 @@ dydx.logical.sp <- function(theta = NULL,
   partial.ef <- y.hat.1 - y.hat.0
   
   return(partial.ef)
+}
+
+dydx.exact.num.from.sp <- function(theta = NULL,
+                                    object,
+                                    variable,
+                                    from.unit = 1,
+                                    data = NULL,
+                                    Sinv = NULL,
+                                    het = TRUE,
+                                    approximation = FALSE,
+                                    pw = 5,
+                                    ...){
+  # Exact continuous from-region impact. This returns the column of the
+  # analytical probability-impact matrix associated with `from.unit`.
+  # Discrete changes, logical variables, and factors continue to use the
+  # predictive contrast path.
+  if (missing(data) || is.null(data)) data <- object$data
+  if (is.null(theta)) theta <- coef(object)
+
+  lambda <- theta["lambda"]
+  betas  <- theta[names(theta) != "lambda"]
+  X      <- object$X
+  n      <- nrow(X)
+  W      <- object$listw
+
+  dfun <- switch(object$link, "probit" = dnorm, "logit" = dlogis)
+
+  if (is.null(Sinv)) {
+    A    <- Matrix::Diagonal(n) - lambda * W
+    Sinv <- if (approximation) app_W(W, lambda, pw) else Matrix::solve(A)
+  }
+
+  Di <- NULL
+  if (het) {
+    Di <- Matrix::Diagonal(x = 1 / sqrt(Matrix::rowSums(Sinv^2)))
+  }
+
+  XB <- as.vector(X %*% betas)
+  a  <- if (het) as.vector(Di %*% (Sinv %*% XB)) else as.vector(Sinv %*% XB)
+  fa <- dfun(a)
+  dM <- Matrix::Diagonal(x = fa) %*% (if (het) Di %*% Sinv else Sinv)
+
+  chain.coef <- dydx.chain.num.sp(var = variable, theta = theta,
+                                  model_data = X, data = data, W = W)
+  out <- as.numeric(dM %*% chain.coef[, from.unit, drop = FALSE])
+  names(out) <- rownames(data)
+  return(out)
 }
 
 # Functions for exact derivatives ----
