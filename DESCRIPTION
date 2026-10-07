@@ -1,17 +1,16 @@
 Package: spldv
 Type: Package
 Title: Spatial Models for Limited Dependent Variables
-Version: 0.2.2
-Date: 2026-07-08
+Version: 0.2.3
+Date: 2026-10-07
 Authors@R: c(person("Mauricio", "Sarrias", role = c("aut", "cre"), email = "msarrias86@gmail.com", comment = c(ORCID = "0000-0001-5932-4817")), person("Gianfranco", "Piras", role = c("aut"), email = "gpiras@mac.com", comment = c(ORCID = "0000-0003-0225-6061")), person("Daniel", "McMillen", role = "ctb"))
-Description: The current version of this package estimates spatial autoregressive models for binary dependent variables using GMM estimators <doi:10.18637/jss.v107.i08> and RIS estimator <doi:10.1007/978-3-662-05617-2_8>. It supports one-step (Pinkse and Slade, 1998) <doi:10.1016/S0304-4076(97)00097-3> and two-step GMM estimator along with the linearized GMM estimator proposed by Klier and McMillen (2008) <doi:10.1198/073500107000000188>. It also allows for either Probit or Logit model and compute the average marginal effects. The RIS estimator allows to estimate the SAR and SEM model. All these models are presented in Sarrias and Piras (2023) <doi:10.1016/j.jocm.2023.100432>. 
+Description: The current version of this package estimates spatial autoregressive models for binary dependent variables using GMM estimators <doi:10.18637/jss.v107.i08> and RIS estimator <doi:10.1007/978-3-662-05617-2_8>. It supports one-step (Pinkse and Slade, 1998) <doi:10.1016/S0304-4076(97)00097-3> and two-step GMM estimator along with the linearized GMM estimator proposed by Klier and McMillen (2008) <doi:10.1198/073500107000000188>. It also allows for either Probit or Logit model and compute the average marginal effects. The RIS estimator allows to estimate the SAR and SEM model. All these models are presented in Sarrias and Piras (2023) <doi:10.1016/j.jocm.2023.100432>. The package also provides maximum likelihood estimation for spatial binary probit models with a continuous endogenous regressor using the Mendell-Elston approximation or recursive importance sampling. 
 Encoding: UTF-8
-RoxygenNote: 7.3.3
 Depends:
     R (>= 4.0) 
 Imports:
     Formula,
-    Matrix, 
+    Matrix (>= 1.6-0), 
     maxLik,
     stats,
     sphet,
@@ -29,3 +28,4 @@ License: GPL (>= 2)
 URL: https://github.com/gpiras/spldv
 BugReports: https://github.com/gpiras/spldv/issues
 LazyData: no
+Config/roxygen2/version: 8.1.0
