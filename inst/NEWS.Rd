@@ -2,6 +2,13 @@
 \title{spldv News}
 \encoding{UTF-8}
 
+\section{CHANGES IN VERSION 0.2.3}{
+  \subsection{BUG FIXES AND IMPROVEMENTS}{
+   \itemize{
+      \item A new maximum likelihood estimator for spatial binary probit models with one continuous endogenous regressor is added. Multivariate normal probabilities can be evaluated using the ME approximation or RIS.
+   }
+  }
+}
 \section{CHANGES IN VERSION 0.2.2}{
   \subsection{BUG FIXES AND IMPROVEMENTS}{
     \itemize{
